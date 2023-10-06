@@ -1,26 +1,62 @@
-import React from 'react';
-import logo from './logo.svg';
-import './App.css';
+// src/App.tsx
+import React, { useEffect, useState } from "react";
+import { BrowserRouter, Routes, Route } from "react-router-dom";
+import RecurringExpensesPage from "./components/RecurringExpensesPage";
+import NonRecurringExpensesPage from "./components/NonRecurringExpensesPage";
+import HistoryPage from "./components/HistoryPage";
+import {
+  signInWithPopup,
+  GoogleAuthProvider,
+  onAuthStateChanged,
+  signOut,
+  User,
+} from "firebase/auth";
+import { auth } from "./utils/firebase";
+import { Login } from "./components/Login";
+import { UserContext } from "./utils/UserContext";
+import { Homepage } from "./components/Homepage";
 
-function App() {
+const allowedEmails = ["john.davis.92790@gmail.com"];
+
+const App: React.FC = () => {
+  const [user, setUser] = useState(null as User | null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    onAuthStateChanged(auth, (user) => {
+      if (user && allowedEmails.includes(user.email || "")) {
+        setUser(user);
+      } else {
+        setUser(null);
+      }
+      setLoading(false);
+    });
+  }, []);
+
+  function signInWithGoogle() {
+    const provider = new GoogleAuthProvider();
+    signInWithPopup(auth, provider);
+  }
+
+  function handleSignOut() {
+    signOut(auth);
+  }
+
   return (
-    <div className="App">
-      <header className="App-header">
-        <img src={logo} className="App-logo" alt="logo" />
-        <p>
-          Edit <code>src/App.tsx</code> and save to reload.
-        </p>
-        <a
-          className="App-link"
-          href="https://reactjs.org"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          Learn React
-        </a>
-      </header>
-    </div>
+    <BrowserRouter>
+      <UserContext.Provider
+        value={{ user, setUser, signInWithGoogle, handleSignOut, loading }}
+      >
+        <Routes>
+        <Route path="/" element={<Homepage />} />
+          <Route path="/recurring" element={<RecurringExpensesPage />} />
+          <Route path="/non-recurring" element={<NonRecurringExpensesPage />} />
+          <Route path="/history" element={<HistoryPage />} />
+          <Route path="login" element={<Login />} />
+        </Routes>
+      </UserContext.Provider>
+    </BrowserRouter>
   );
-}
+};
 
 export default App;
