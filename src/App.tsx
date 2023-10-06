@@ -16,7 +16,10 @@ import { Login } from "./components/Login";
 import { UserContext } from "./utils/UserContext";
 import { Homepage } from "./components/Homepage";
 
-const allowedEmails = ["john.davis.92790@gmail.com"];
+const allowedEmails = [
+  process.env.REACT_APP_EMAIL_1,
+  process.env.REACT_APP_EMAIL_2,
+];
 
 const App: React.FC = () => {
   const [user, setUser] = useState(null as User | null);
@@ -48,7 +51,7 @@ const App: React.FC = () => {
         value={{ user, setUser, signInWithGoogle, handleSignOut, loading }}
       >
         <Routes>
-        <Route path="/" element={<Homepage />} />
+          <Route path="/" element={<Homepage />} />
           <Route path="/recurring" element={<RecurringExpensesPage />} />
           <Route path="/non-recurring" element={<NonRecurringExpensesPage />} />
           <Route path="/history" element={<HistoryPage />} />
