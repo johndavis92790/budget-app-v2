@@ -30,7 +30,7 @@ const RecurringExpensesPage: React.FC = () => {
   const [isEditMode, setIsEditMode] = useState(false);
   const [currentEntry, setCurrentEntry] = useState<Entry | null>(null);
   const [currentType, setCurrentType] = useState<"income" | "expense" | null>(
-    null
+    null,
   );
 
   const [showModal, setShowModal] = useState<boolean>(false);
@@ -91,7 +91,7 @@ const RecurringExpensesPage: React.FC = () => {
         currentEntry.name,
         currentEntry.value,
         entryName,
-        entryValue
+        entryValue,
       );
       const updatedEntry = { name: entryName, value: entryValue };
 
@@ -100,16 +100,16 @@ const RecurringExpensesPage: React.FC = () => {
           incomes.map((e) =>
             e.name === currentEntry.name && e.value === currentEntry.value
               ? updatedEntry
-              : e
-          )
+              : e,
+          ),
         );
       } else {
         setExpenses(
           expenses.map((e) =>
             e.name === currentEntry.name && e.value === currentEntry.value
               ? updatedEntry
-              : e
-          )
+              : e,
+          ),
         );
       }
     }
@@ -125,11 +125,11 @@ const RecurringExpensesPage: React.FC = () => {
 
     if (type === "income") {
       setIncomes((prev) =>
-        prev.filter((e) => !(e.name === entry.name && e.value === entry.value))
+        prev.filter((e) => !(e.name === entry.name && e.value === entry.value)),
       );
     } else {
       setExpenses((prev) =>
-        prev.filter((e) => !(e.name === entry.name && e.value === entry.value))
+        prev.filter((e) => !(e.name === entry.name && e.value === entry.value)),
       );
     }
   };

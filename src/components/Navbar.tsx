@@ -25,7 +25,6 @@ export function BudgetNavbar({ sticky = true }) {
                     <NavDropdown.Item onClick={handleSignOut}>
                       LOGOUT
                     </NavDropdown.Item>
-
                   </>
                 ) : (
                   <>

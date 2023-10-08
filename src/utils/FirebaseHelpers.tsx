@@ -56,7 +56,7 @@ export const updateRecurringEntry = async (
   oldName: string,
   oldValue: number,
   newName: string,
-  newValue: number
+  newValue: number,
 ) => {
   const budgetRef = doc(firestore, "familyBudget", "budget");
   const newEntry = { name: newName, value: newValue };
@@ -74,7 +74,7 @@ export const updateRecurringEntry = async (
             .data()
             .incomes.filter(
               (entry: Entry) =>
-                entry.name !== oldName && entry.value !== oldValue
+                entry.name !== oldName && entry.value !== oldValue,
             ),
           newEntry,
         ],
@@ -86,7 +86,7 @@ export const updateRecurringEntry = async (
             .data()
             .expenses.filter(
               (entry: Entry) =>
-                entry.name !== oldName && entry.value !== oldValue
+                entry.name !== oldName && entry.value !== oldValue,
             ),
           newEntry,
         ],
@@ -98,7 +98,7 @@ export const updateRecurringEntry = async (
 export const deleteRecurringEntry = async (
   type: "income" | "expense",
   name: string,
-  value: number
+  value: number,
 ) => {
   const budgetRef = doc(firestore, "familyBudget", "budget");
 

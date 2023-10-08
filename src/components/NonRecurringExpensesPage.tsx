@@ -1,5 +1,5 @@
 // src/components/NonRecurringExpensesPage.tsx
-import React from 'react';
+import React from "react";
 
 const NonRecurringExpensesPage: React.FC = () => {
   // TODO: Handle non-recurring expenses and refunds
