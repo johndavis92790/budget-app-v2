@@ -59,14 +59,12 @@ export const updateRecurringEntry = async (
   newValue: number
 ) => {
   const budgetRef = doc(firestore, "familyBudget", "budget");
-
-  const oldEntry = { name: oldName, value: oldValue };
   const newEntry = { name: newName, value: newValue };
 
   await runTransaction(firestore, async (transaction) => {
     const currentData = await transaction.get(budgetRef);
     if (!currentData.exists()) {
-      throw "Document does not exist!";
+      throw new Error("Document does not exist!");
     }
 
     if (type === "income") {
