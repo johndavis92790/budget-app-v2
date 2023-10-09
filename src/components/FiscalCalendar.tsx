@@ -52,12 +52,12 @@ const getFiscalMonthEvents = (visibleDate: Date) => {
   const startDate = new Date(
     visibleDate.getFullYear() - 1,
     visibleDate.getMonth(),
-    1
+    1,
   );
   const endDate = new Date(
     visibleDate.getFullYear() + 1,
     visibleDate.getMonth() + 1,
-    0
+    0,
   );
 
   let currentMonthStart = new Date(startDate);
@@ -83,7 +83,7 @@ const getFiscalMonthEvents = (visibleDate: Date) => {
     currentMonthStart = new Date(
       currentMonthStart.getFullYear(),
       currentMonthStart.getMonth() + 1,
-      1
+      1,
     );
   }
 
@@ -108,7 +108,7 @@ const getUniqueEvents = (events: FiscalMonthEvent[]) => {
 const getFiscalStartDate = (visibleDate: Date) => {
   const baseDate = new Date(2023, 8, 17);
   const daysDifference = Math.floor(
-    (visibleDate.getTime() - baseDate.getTime()) / (1000 * 3600 * 24)
+    (visibleDate.getTime() - baseDate.getTime()) / (1000 * 3600 * 24),
   );
   const fiscalDaysOffset = daysDifference % 28;
   const fiscalStartDate = new Date(visibleDate);
