@@ -8,10 +8,13 @@ import {
 } from "../utils/FirebaseHelpers";
 import { Table, Form, Button, Modal } from "react-bootstrap";
 import { formatAsCurrency } from "../utils/Helpers";
+import { Timestamp } from "firebase/firestore";
 
 export type Entry = {
   name: string;
   value: number;
+  category?: string;
+  date?: Date | Timestamp;
 };
 
 const RecurringExpensesPage: React.FC = () => {

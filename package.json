@@ -13,8 +13,10 @@
     "@types/react-dom": "^18.2.10",
     "firebase": "^10.4.0",
     "firebaseui": "^6.1.0",
+    "moment": "^2.29.4",
     "prettier": "^3.0.3",
     "react": "^18.2.0",
+    "react-big-calendar": "^1.8.4",
     "react-bootstrap": "^2.9.0",
     "react-dom": "^18.2.0",
     "react-router-dom": "^6.16.0",
@@ -48,5 +50,8 @@
       "last 1 firefox version",
       "last 1 safari version"
     ]
+  },
+  "devDependencies": {
+    "@types/react-big-calendar": "^1.6.5"
   }
 }

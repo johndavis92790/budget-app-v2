@@ -6,6 +6,7 @@ import {
   arrayUnion,
   arrayRemove,
   runTransaction,
+  Timestamp,
 } from "firebase/firestore";
 import { firestore } from "./firebase";
 import { Entry } from "../components/RecurringExpensesPage";
@@ -113,4 +114,66 @@ export const deleteRecurringEntry = async (
       expenses: arrayRemove(entry),
     });
   }
+};
+
+type NonRecurringEntry = {
+  name: string;
+  category: string;
+  date: Date;
+  value: number;
+};
+
+export const addNonRecurringExpense = async (entry: NonRecurringEntry) => {
+  const nonRecurringRef = doc(
+    firestore,
+    "familyBudget",
+    "nonRecurringExpenses",
+  );
+  const nonRecurringSnap = await getDoc(nonRecurringRef);
+
+  if (nonRecurringSnap.exists()) {
+    await updateDoc(nonRecurringRef, {
+      expenses: arrayUnion(entry),
+    });
+  } else {
+    await setDoc(nonRecurringRef, {
+      expenses: [entry],
+    });
+  }
+};
+
+export const fetchNonRecurringExpenses = async () => {
+  const nonRecurringRef = doc(
+    firestore,
+    "familyBudget",
+    "nonRecurringExpenses",
+  );
+  const nonRecurringSnap = await getDoc(nonRecurringRef);
+  const expenses = nonRecurringSnap.data()?.expenses || [];
+
+  return expenses.map((expense: Entry) => {
+    let date: Date | undefined;
+
+    if (expense.date instanceof Timestamp) {
+      date = expense.date.toDate();
+    } else {
+      date = expense.date;
+    }
+
+    return {
+      ...expense,
+      date,
+    };
+  });
+};
+
+export const deleteNonRecurringExpense = async (entry: NonRecurringEntry) => {
+  const nonRecurringRef = doc(
+    firestore,
+    "familyBudget",
+    "nonRecurringExpenses",
+  );
+  await updateDoc(nonRecurringRef, {
+    expenses: arrayRemove(entry),
+  });
 };
