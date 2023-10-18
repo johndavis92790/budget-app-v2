@@ -7,15 +7,7 @@ import {
   deleteRecurringEntry,
 } from "../utils/FirebaseHelpers";
 import { Table, Form, Button, Modal } from "react-bootstrap";
-import { formatAsCurrency } from "../utils/Helpers";
-import { Timestamp } from "firebase/firestore";
-
-export type Entry = {
-  name: string;
-  value: number;
-  category?: string;
-  date?: Date | Timestamp;
-};
+import { Entry, formatAsCurrency } from "../utils/Helpers";
 
 const RecurringExpensesPage: React.FC = () => {
   const contextValue = useUserContext();

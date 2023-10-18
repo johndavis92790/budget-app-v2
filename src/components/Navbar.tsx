@@ -20,6 +20,7 @@ export function BudgetNavbar({ sticky = true }) {
               <Nav.Link href="/">HOME</Nav.Link>
               <Nav.Link href="/recurring">recurring</Nav.Link>
               <Nav.Link href="/non-recurring">non-recurring</Nav.Link>
+              <Nav.Link href="/history">history</Nav.Link>
               <NavDropdown title="Admin Links" id="navbarScrollingDropdown">
                 {user ? (
                   <>

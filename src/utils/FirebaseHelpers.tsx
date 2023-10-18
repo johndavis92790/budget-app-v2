@@ -9,7 +9,7 @@ import {
   Timestamp,
 } from "firebase/firestore";
 import { firestore } from "./firebase";
-import { Entry } from "../components/RecurringExpensesPage";
+import { Entry } from "./Helpers";
 
 export const addRecurringEntry = async (entry: {
   type: "income" | "expense";
@@ -57,7 +57,7 @@ export const updateRecurringEntry = async (
   oldName: string,
   oldValue: number,
   newName: string,
-  newValue: number,
+  newValue: number
 ) => {
   const budgetRef = doc(firestore, "familyBudget", "budget");
   const newEntry = { name: newName, value: newValue };
@@ -75,7 +75,7 @@ export const updateRecurringEntry = async (
             .data()
             .incomes.filter(
               (entry: Entry) =>
-                entry.name !== oldName && entry.value !== oldValue,
+                entry.name !== oldName && entry.value !== oldValue
             ),
           newEntry,
         ],
@@ -87,7 +87,7 @@ export const updateRecurringEntry = async (
             .data()
             .expenses.filter(
               (entry: Entry) =>
-                entry.name !== oldName && entry.value !== oldValue,
+                entry.name !== oldName && entry.value !== oldValue
             ),
           newEntry,
         ],
@@ -99,7 +99,7 @@ export const updateRecurringEntry = async (
 export const deleteRecurringEntry = async (
   type: "income" | "expense",
   name: string,
-  value: number,
+  value: number
 ) => {
   const budgetRef = doc(firestore, "familyBudget", "budget");
 
@@ -127,7 +127,7 @@ export const addNonRecurringExpense = async (entry: NonRecurringEntry) => {
   const nonRecurringRef = doc(
     firestore,
     "familyBudget",
-    "nonRecurringExpenses",
+    "nonRecurringExpenses"
   );
   const nonRecurringSnap = await getDoc(nonRecurringRef);
 
@@ -146,7 +146,7 @@ export const fetchNonRecurringExpenses = async () => {
   const nonRecurringRef = doc(
     firestore,
     "familyBudget",
-    "nonRecurringExpenses",
+    "nonRecurringExpenses"
   );
   const nonRecurringSnap = await getDoc(nonRecurringRef);
   const expenses = nonRecurringSnap.data()?.expenses || [];
@@ -171,9 +171,100 @@ export const deleteNonRecurringExpense = async (entry: NonRecurringEntry) => {
   const nonRecurringRef = doc(
     firestore,
     "familyBudget",
-    "nonRecurringExpenses",
+    "nonRecurringExpenses"
   );
   await updateDoc(nonRecurringRef, {
     expenses: arrayRemove(entry),
   });
+};
+
+export const fetchCurrentGoal = async (): Promise<number | null> => {
+  const goalRef = doc(firestore, "familyBudget", "currentGoal");
+  const goalSnap = await getDoc(goalRef);
+
+  if (goalSnap.exists() && typeof goalSnap.data()?.amount === "number") {
+    return goalSnap.data()?.amount;
+  } else {
+    return null;
+  }
+};
+
+export const updateMonthlyGoal = async (newGoal: number): Promise<void> => {
+  const goalRef = doc(firestore, "familyBudget", "currentGoal");
+  const goalSnap = await getDoc(goalRef);
+
+  if (goalSnap.exists()) {
+    await updateDoc(goalRef, {
+      amount: newGoal,
+    });
+  } else {
+    await setDoc(goalRef, {
+      amount: newGoal,
+    });
+  }
+};
+
+export const fetchTotalIncomeAndExpenses = async (): Promise<{
+  totalIncome: number;
+  totalExpenses: number;
+}> => {
+  const data = await fetchRecurringEntries();
+  let totalIncome = 0;
+  let totalExpenses = 0;
+
+  if (data?.incomes) {
+    totalIncome = data.incomes.reduce(
+      (acc: number, entry: Entry) => acc + entry.value,
+      0
+    );
+  }
+
+  if (data?.expenses) {
+    totalExpenses = data.expenses.reduce(
+      (acc: number, entry: Entry) => acc + entry.value,
+      0
+    );
+  }
+
+  return {
+    totalIncome,
+    totalExpenses,
+  };
+};
+
+export const updateTotalIncome = async (newIncome: number): Promise<void> => {
+  const budgetRef = doc(firestore, "familyBudget", "budget");
+  const currentData = await getDoc(budgetRef);
+
+  if (currentData.exists()) {
+    const incomes = currentData.data()?.incomes || [];
+    incomes.push({ name: `Income ${incomes.length + 1}`, value: newIncome });
+    await updateDoc(budgetRef, { incomes });
+  } else {
+    await setDoc(budgetRef, {
+      incomes: [{ name: "Income 1", value: newIncome }],
+      expenses: [],
+    });
+  }
+};
+
+export const updateTotalExpenses = async (
+  newExpense: number
+): Promise<void> => {
+  const budgetRef = doc(firestore, "familyBudget", "budget");
+  const currentData = await getDoc(budgetRef);
+
+  if (currentData.exists()) {
+    const expenses = currentData.data()?.expenses || [];
+    expenses.push({
+      name: `Expense ${expenses.length + 1}`,
+      value: newExpense,
+    });
+    await updateDoc(budgetRef, { expenses });
+  } else {
+    await setDoc(budgetRef, {
+      incomes: [],
+      expenses: [{ name: "Expense 1", value: newExpense }],
+    });
+  }
 };

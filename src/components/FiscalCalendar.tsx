@@ -14,7 +14,7 @@ type FiscalMonthEvent = {
 const localizer = momentLocalizer(moment);
 
 export const FiscalCalendar: React.FC = () => {
-  const [date, setDate] = useState(new Date()); // To store the currently visible date
+  const [date, setDate] = useState(new Date());
 
   return (
     <div style={{ height: 600 }}>
@@ -28,18 +28,37 @@ export const FiscalCalendar: React.FC = () => {
         selectable={true}
         eventPropGetter={eventStyleGetter}
         components={{
-          event: ({ event }: { event: FiscalMonthEvent }) => {
+          event: ({
+            event,
+            title,
+          }: {
+            event: FiscalMonthEvent;
+            title: string;
+          }) => {
             if (event.start.getDay() === 0) {
-              return <span>{event.title}</span>;
+              return (
+                <div
+                  style={{
+                    textAlign: "center",
+                    width: "100%",
+                    height: "100%",
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                  }}
+                >
+                  {title}
+                </div>
+              );
             }
-            return <span></span>;
+            return null;
           },
         }}
         date={date}
         onNavigate={(newDate: string | number | Date) =>
           setDate(new Date(newDate))
         }
-        events={getUniqueEvents(getFiscalMonthEvents(date))}
+        events={getFiscalMonthEvents(date)}
       />
     </div>
   );
@@ -48,67 +67,39 @@ export const FiscalCalendar: React.FC = () => {
 const getFiscalMonthEvents = (visibleDate: Date) => {
   const events = [];
 
-  // Generate dates for a wider range: one year back and one year forward
-  const startDate = new Date(
-    visibleDate.getFullYear() - 1,
-    visibleDate.getMonth(),
-    1,
-  );
-  const endDate = new Date(
-    visibleDate.getFullYear() + 1,
-    visibleDate.getMonth() + 1,
-    0,
-  );
+  // Find the start of the fiscal month of the visibleDate
+  let fiscalStartDate = getFiscalStartDate(visibleDate);
 
-  let currentMonthStart = new Date(startDate);
-
-  while (currentMonthStart <= endDate) {
-    let fiscalStartDate = getFiscalStartDate(currentMonthStart);
-    let fiscalDate = new Date(fiscalStartDate);
-
+  // To cover the entire visible calendar month, generate events 
+  // for the previous, current, and next fiscal month.
+  for (let monthOffset = -1; monthOffset <= 1; monthOffset++) {
+    let offsetDate = new Date(fiscalStartDate);
+    offsetDate.setDate(fiscalStartDate.getDate() + monthOffset * 28);
+    let fiscalDate = new Date(offsetDate);
+    
     for (let i = 0; i < 4; i++) {
-      for (let j = 0; j < 7; j++) {
-        events.push({
-          title: `${ordinal(i + 1)} Week`,
-          start: new Date(fiscalDate),
-          end: new Date(fiscalDate),
-          allDay: true,
-          weekNumber: i + 1,
-        });
-        fiscalDate.setDate(fiscalDate.getDate() + 1);
-      }
+      events.push({
+        title: `${ordinal(i + 1)} Week`,
+        start: new Date(fiscalDate),
+        end: new Date(
+          fiscalDate.getFullYear(),
+          fiscalDate.getMonth(),
+          fiscalDate.getDate() + 7
+        ),
+        allDay: true,
+        weekNumber: i + 1,
+      });
+      fiscalDate.setDate(fiscalDate.getDate() + 7);
     }
-
-    // Move to the next month
-    currentMonthStart = new Date(
-      currentMonthStart.getFullYear(),
-      currentMonthStart.getMonth() + 1,
-      1,
-    );
   }
 
   return events;
 };
 
-const getUniqueEvents = (events: FiscalMonthEvent[]) => {
-  const seenDates: Set<string> = new Set();
-  const uniqueEvents: FiscalMonthEvent[] = [];
-
-  for (let event of events) {
-    const eventDateStr = event.start.toISOString();
-    if (!seenDates.has(eventDateStr)) {
-      seenDates.add(eventDateStr);
-      uniqueEvents.push(event);
-    }
-  }
-
-  return uniqueEvents;
-};
-
 const getFiscalStartDate = (visibleDate: Date) => {
   const baseDate = new Date(2023, 8, 17);
   const daysDifference = Math.floor(
-    (visibleDate.getTime() - baseDate.getTime()) / (1000 * 3600 * 24),
+    (visibleDate.getTime() - baseDate.getTime()) / (1000 * 3600 * 24)
   );
   const fiscalDaysOffset = daysDifference % 28;
   const fiscalStartDate = new Date(visibleDate);
@@ -119,13 +110,13 @@ const getFiscalStartDate = (visibleDate: Date) => {
 const eventStyleGetter = (event: FiscalMonthEvent) => {
   let backgroundColor = "#f0f0f0";
   if (event.weekNumber === 1) {
-    backgroundColor = "#f4cccc";
-  } else if (event.weekNumber === 2) {
-    backgroundColor = "#fce5cd";
-  } else if (event.weekNumber === 3) {
-    backgroundColor = "#fff2cc";
-  } else if (event.weekNumber === 4) {
     backgroundColor = "#d9ead3";
+  } else if (event.weekNumber === 2) {
+    backgroundColor = "#fff2cc";
+  } else if (event.weekNumber === 3) {
+    backgroundColor = "#fce5cd";
+  } else if (event.weekNumber === 4) {
+    backgroundColor = "#f4cccc";
   }
 
   let style = {

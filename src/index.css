@@ -15,3 +15,8 @@ code {
 .money-column-right-align {
   text-align: right;
 }
+
+.rbc-today {
+  background-color: #b5dfff !important;
+}
+

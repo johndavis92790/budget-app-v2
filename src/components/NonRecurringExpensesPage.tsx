@@ -1,12 +1,13 @@
 import React, { useState, useEffect } from "react";
 import {
-  fetchRecurringEntries,
   addNonRecurringExpense,
   fetchNonRecurringExpenses,
+  updateMonthlyGoal,
+  fetchCurrentGoal,
 } from "../utils/FirebaseHelpers";
-import { formatAsCurrency } from "../utils/Helpers";
-import { Entry } from "./RecurringExpensesPage";
+import { Entry, formatAsCurrency, getLast28DaysStartDate } from "../utils/Helpers";
 import { FiscalCalendar } from "./FiscalCalendar";
+import { Table } from "react-bootstrap";
 
 const NonRecurringExpensesPage: React.FC = () => {
   const [monthlyGoal, setMonthlyGoal] = useState<number>(0);
@@ -20,28 +21,9 @@ const NonRecurringExpensesPage: React.FC = () => {
     fetchNonRecurringExpenses().then((expenses) => {
       setNonRecurringExpenses(expenses);
     });
-  }, []);
 
-  useEffect(() => {
-    fetchRecurringEntries().then((data) => {
-      if (data) {
-        const totalIncome = (data.incomes || []).reduce(
-          (acc: number, curr: Entry) => acc + curr.value,
-          0,
-        );
-        const tithingValue = totalIncome * 0.1;
-        const totalExpense =
-          (data.expenses || []).reduce(
-            (acc: number, curr: Entry) => acc + curr.value,
-            0,
-          ) + tithingValue;
-        const yearlyIncome = totalIncome * 12;
-        const yearlyExpenses = totalExpense * 12;
-        const availableFiscalMonthly =
-          ((yearlyIncome - yearlyExpenses) / 52) * 4;
-
-        setMonthlyGoal(availableFiscalMonthly);
-      }
+    fetchCurrentGoal().then((goal) => {
+      setMonthlyGoal(goal || 0);
     });
   }, []);
 
@@ -57,7 +39,9 @@ const NonRecurringExpensesPage: React.FC = () => {
 
       addNonRecurringExpense(newExpense).then(() => {
         setNonRecurringExpenses((prev) => [...prev, newExpense]);
-        setMonthlyGoal((prev) => prev - currentAmount);
+        const updatedGoal = monthlyGoal - currentAmount;
+        setMonthlyGoal(updatedGoal);
+        updateMonthlyGoal(updatedGoal);
       });
 
       setCurrentExpense("");
@@ -69,7 +53,7 @@ const NonRecurringExpensesPage: React.FC = () => {
 
   const totalExpenses = nonRecurringExpenses.reduce(
     (acc, curr) => acc + curr.value,
-    0,
+    0
   );
 
   return (
@@ -107,7 +91,8 @@ const NonRecurringExpensesPage: React.FC = () => {
       </form>
 
       {/* Display list of non-recurring expenses */}
-      <table>
+      <h2>Non-Recurring Expenses</h2>
+      <Table striped bordered hover>
         <thead>
           <tr>
             <th>Name</th>
@@ -117,21 +102,40 @@ const NonRecurringExpensesPage: React.FC = () => {
           </tr>
         </thead>
         <tbody>
-          {nonRecurringExpenses.map((expense, idx) => (
-            <tr key={idx}>
-              <td>{expense.name}</td>
-              <td>{expense.category || "N/A"}</td>
-              <td>
-                {expense.date
-                  ? (expense.date as Date).toLocaleDateString()
-                  : "N/A"}
-              </td>
+          {nonRecurringExpenses
+            .filter((expense) => {
+              // Ensure the date exists
+              if (!expense.date) {
+                return false;
+              }
 
-              <td>{formatAsCurrency(expense.value)}</td>
-            </tr>
-          ))}
+              // Convert Firestore Timestamp to JavaScript Date
+              const expenseDate =
+                expense.date instanceof Date
+                  ? expense.date
+                  : expense.date.toDate();
+
+              return expenseDate >= getLast28DaysStartDate();
+            })
+            .map((expense, idx) => (
+              <tr key={idx}>
+                <td>{expense.name}</td>
+                <td>{expense.category || "N/A"}</td>
+                <td className="date-column">
+                  {expense.date
+                    ? (expense.date instanceof Date
+                        ? expense.date
+                        : expense.date.toDate()
+                      ).toLocaleDateString()
+                    : "N/A"}
+                </td>
+                <td className="money-column-right-align">
+                  {formatAsCurrency(expense.value)}
+                </td>
+              </tr>
+            ))}
         </tbody>
-      </table>
+      </Table>
 
       {/* Stretch Goal: Visual representation */}
       {/* Calculate progress as: (monthlyGoal - totalExpenses) / monthlyGoal * 100 */}
