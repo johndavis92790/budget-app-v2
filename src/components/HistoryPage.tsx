@@ -1,6 +1,13 @@
 import React, { useState, useEffect } from "react";
-import { fetchNonRecurringExpenses } from "../utils/FirebaseHelpers";
-import { Entry, formatAsCurrency } from "../utils/Helpers";
+import {
+  fetchCategories,
+  fetchNonRecurringExpenses,
+} from "../utils/FirebaseHelpers";
+import {
+  NonRecurringEntry,
+  formatAsCurrency,
+  formatDate,
+} from "../utils/Helpers";
 import {
   Table,
   Form,
@@ -12,7 +19,9 @@ import {
 import { TimeChart } from "./TimeChart";
 
 const HistoryPage: React.FC = () => {
-  const [nonRecurringExpenses, setNonRecurringExpenses] = useState<Entry[]>([]);
+  const [nonRecurringExpenses, setNonRecurringExpenses] = useState<
+    NonRecurringEntry[]
+  >([]);
   const [searchTerm, setSearchTerm] = useState<string>("");
   const currentDate = new Date();
   const lastYearDate = new Date(currentDate);
@@ -25,7 +34,11 @@ const HistoryPage: React.FC = () => {
   );
   const [amountMin, setAmountMin] = useState<number>(0);
   const [amountMax, setAmountMax] = useState<number>(10000); // just a random high value for demo
-  const [filteredExpenses, setFilteredExpenses] = useState<Entry[]>([]);
+  const [filteredExpenses, setFilteredExpenses] = useState<NonRecurringEntry[]>(
+    []
+  );
+  const [currentCategory, setCurrentCategory] = useState<string>("");
+  const [categories, setCategories] = useState<string[]>([]);
   const [currentPage, setCurrentPage] = useState(1);
   const rowsPerPage = 100; // You can make this a state variable if you want it to be dynamic.
   const displayedExpenses = filteredExpenses.slice(
@@ -42,28 +55,47 @@ const HistoryPage: React.FC = () => {
     fetchNonRecurringExpenses().then((expenses) => {
       setNonRecurringExpenses(expenses);
       setFilteredExpenses(expenses);
+      fetchCategories().then(setCategories);
     });
   }, []);
 
   useEffect(() => {
     const results = nonRecurringExpenses.filter((expense) => {
-      const validNameOrCategory =
+      const matchesSearchTerm =
         expense.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        expense.category?.toLowerCase().includes(searchTerm.toLowerCase());
+        (expense.category &&
+          expense.category.toLowerCase().includes(searchTerm.toLowerCase()));
 
-      const validDate =
-        (!dateStart || (expense.date && expense.date >= new Date(dateStart))) &&
-        (!dateEnd || (expense.date && expense.date <= new Date(dateEnd)));
+      const matchesCategory =
+        !currentCategory ||
+        currentCategory === "Choose" ||
+        expense.category === currentCategory;
 
+      if (!expense.date) return false;
+
+      const expenseActualDate = new Date(expense.date);
+      const expenseDateString = `${expenseActualDate.getUTCFullYear()}-${String(
+        expenseActualDate.getUTCMonth() + 1
+      ).padStart(2, "0")}-${String(expenseActualDate.getUTCDate()).padStart(
+        2,
+        "0"
+      )}`;
+
+      const isValidStartDate = !dateStart || expenseDateString >= dateStart;
+      const isValidEndDate = !dateEnd || expenseDateString <= dateEnd;
       const validAmount =
         expense.value >= amountMin && expense.value <= amountMax;
 
-      return validNameOrCategory && validDate && validAmount;
+      return (
+        matchesSearchTerm &&
+        isValidStartDate &&
+        isValidEndDate &&
+        validAmount &&
+        matchesCategory
+      );
     });
 
     setFilteredExpenses(results);
-
-    // Reset the current page to 1 whenever the filtered results change
     setCurrentPage(1);
   }, [
     searchTerm,
@@ -72,6 +104,7 @@ const HistoryPage: React.FC = () => {
     amountMin,
     amountMax,
     nonRecurringExpenses,
+    currentCategory,
   ]);
 
   return (
@@ -82,11 +115,23 @@ const HistoryPage: React.FC = () => {
       <Form className="mb-3 form-inline">
         <FormControl
           type="text"
-          placeholder="Search by Name/Category"
+          placeholder="Search by Name"
           className="mr-sm-2 mb-2"
           value={searchTerm}
           onChange={(e) => setSearchTerm(e.target.value)}
         />
+
+        <Form.Select
+          value={currentCategory}
+          onChange={(e) => setCurrentCategory(e.target.value)}
+        >
+          <option>Choose</option>
+          {categories.map((cat) => (
+            <option key={cat} value={cat}>
+              {cat}
+            </option>
+          ))}
+        </Form.Select>
 
         <InputGroup className="mb-2 mr-sm-2">
           <div className="input-group-prepend">
@@ -161,12 +206,7 @@ const HistoryPage: React.FC = () => {
               <td>{expense.name}</td>
               <td>{expense.category || "N/A"}</td>
               <td className="date-column">
-                {expense.date
-                  ? (expense.date instanceof Date
-                      ? expense.date
-                      : expense.date.toDate()
-                    ).toLocaleDateString()
-                  : "N/A"}
+                {expense.date ? formatDate(expense.date) : "N/A"}
               </td>
               <td className="money-column-right-align">
                 {formatAsCurrency(expense.value)}

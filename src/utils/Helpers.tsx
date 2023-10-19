@@ -29,9 +29,22 @@ export const shortMonths = [
   "Dec",
 ];
 
-export type Entry = {
+export type NonRecurringEntry = {
+  name: string;
+  category: string;
+  date: string;
+  value: number;
+};
+
+export type RecurringEntry = {
   name: string;
   value: number;
-  category?: string;
-  date?: Date | Timestamp;
 };
+
+export const todaysDate = new Date().toISOString().split("T")[0];
+
+export function formatDate(dateString: string): string {
+  const [year, month, day] = dateString.split("-").map((s) => parseInt(s, 10));
+  const dateObj = new Date(year, month - 1, day); // months are 0-indexed in JS
+  return dateObj.toLocaleDateString();
+}

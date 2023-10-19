@@ -1,8 +1,8 @@
 import { Chart } from "react-google-charts";
-import { Entry, shortMonths } from "../utils/Helpers";
+import { NonRecurringEntry, shortMonths } from "../utils/Helpers";
 
 interface TimeChartProps {
-  filteredExpenses: Entry[];
+  filteredExpenses: NonRecurringEntry[];
 }
 
 export function TimeChart(props: TimeChartProps) {
@@ -10,8 +10,8 @@ export function TimeChart(props: TimeChartProps) {
     const monthlySums: { [key: string]: number } = {};
 
     props.filteredExpenses.forEach((expense) => {
-      const date =
-        expense.date instanceof Date ? expense.date : expense.date?.toDate();
+      const date = new Date(expense.date);
+
       if (date) {
         const monthYearKey = `${
           shortMonths[date.getMonth()]

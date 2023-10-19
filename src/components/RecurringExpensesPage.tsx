@@ -7,14 +7,14 @@ import {
   deleteRecurringEntry,
 } from "../utils/FirebaseHelpers";
 import { Table, Form, Button, Modal } from "react-bootstrap";
-import { Entry, formatAsCurrency } from "../utils/Helpers";
+import { RecurringEntry, formatAsCurrency } from "../utils/Helpers";
 
 const RecurringExpensesPage: React.FC = () => {
   const contextValue = useUserContext();
   const user = contextValue?.user || null;
 
-  const [incomes, setIncomes] = useState<Entry[]>([]);
-  const [expenses, setExpenses] = useState<Entry[]>([]);
+  const [incomes, setIncomes] = useState<RecurringEntry[]>([]);
+  const [expenses, setExpenses] = useState<RecurringEntry[]>([]);
   const sortedIncomes = [...incomes].sort((a, b) => b.value - a.value);
   const sortedExpenses = [...expenses].sort((a, b) => b.value - a.value);
 
@@ -23,7 +23,7 @@ const RecurringExpensesPage: React.FC = () => {
   const [entryType, setEntryType] = useState<"income" | "expense">("income");
 
   const [isEditMode, setIsEditMode] = useState(false);
-  const [currentEntry, setCurrentEntry] = useState<Entry | null>(null);
+  const [currentEntry, setCurrentEntry] = useState<RecurringEntry | null>(null);
   const [currentType, setCurrentType] = useState<"income" | "expense" | null>(
     null,
   );
@@ -69,7 +69,7 @@ const RecurringExpensesPage: React.FC = () => {
     }
   };
 
-  const handleEdit = (type: "income" | "expense", entry: Entry) => {
+  const handleEdit = (type: "income" | "expense", entry: RecurringEntry) => {
     setCurrentEntry(entry);
     setCurrentType(type);
     setEntryName(entry.name);
@@ -115,7 +115,7 @@ const RecurringExpensesPage: React.FC = () => {
     handleCloseModal();
   };
 
-  const handleDelete = (type: "income" | "expense", entry: Entry) => {
+  const handleDelete = (type: "income" | "expense", entry: RecurringEntry) => {
     deleteRecurringEntry(type, entry.name, entry.value);
 
     if (type === "income") {
@@ -130,7 +130,7 @@ const RecurringExpensesPage: React.FC = () => {
   };
 
   const totalIncome = incomes.reduce((acc, curr) => acc + curr.value, 0);
-  const tithing: Entry = {
+  const tithing: RecurringEntry = {
     name: "Tithing",
     value: totalIncome * 0.1,
   };
@@ -144,8 +144,8 @@ const RecurringExpensesPage: React.FC = () => {
   const yearlyExpenses = monthlyExpenses * 12;
 
   const availableMonthly = monthlyIncome - monthlyExpenses;
-  const availableFiscalMonthly = ((yearlyIncome - yearlyExpenses) / 52) * 4;
-  const availableWeekly = (yearlyIncome - yearlyExpenses) / 52;
+  const availableFiscalMonthly = ((yearlyIncome - yearlyExpenses) / 365) * 28;
+  const availableWeekly = ((yearlyIncome - yearlyExpenses) / 365) * 7;
 
   const handleEntryDelete = () => {
     if (currentType && currentEntry) {
