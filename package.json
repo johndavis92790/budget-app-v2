@@ -31,7 +31,7 @@
     "eject": "react-scripts eject",
     "build": "react-scripts build",
     "build:firebase": "env-cmd -f .env.production react-scripts build",
-    "deploy": "npm run build && firebase deploy",
+    "deploy": "git push origin main && npm run build && firebase deploy",
     "pretty": "prettier --write \"src/**/*.{js,jsx,ts,tsx,json,html,css,scss,md}\""
   },
   "eslintConfig": {
