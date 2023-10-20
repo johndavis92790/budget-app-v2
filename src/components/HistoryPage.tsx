@@ -72,12 +72,9 @@ const HistoryPage: React.FC = () => {
 
   useEffect(() => {
     const results = nonRecurringExpenses.filter((expense) => {
-      const matchesSearchTerm =
-        expense.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        (expense.tags &&
-          expense.tags.some((tag) =>
-            searchTerm.toLowerCase().includes(tag.toLowerCase())
-          ));
+      const matchesSearchTerm = expense.name
+        .toLowerCase()
+        .includes(searchTerm.toLowerCase());
 
       // Updated to use some() to check if at least one tag matches
       const matchesTags =
@@ -175,10 +172,6 @@ const HistoryPage: React.FC = () => {
           amountRange={amountRange}
           onAmountRangeChange={(range) => setAmountRange(range)}
         />
-
-        <Button variant="outline-success" className="mb-2">
-          Filter
-        </Button>
       </Form>
 
       <TimeChart filteredExpenses={filteredExpenses}></TimeChart>
