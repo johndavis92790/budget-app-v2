@@ -9,6 +9,7 @@ import { Table, Form, FormControl, Button, InputGroup } from "react-bootstrap";
 import { TimeChart } from "./TimeChart";
 import TablePagination from "./TablePagination";
 import Select from "react-select";
+import AmountRangeSlider from "./AmountRangeSlider";
 
 const HistoryPage: React.FC = () => {
   const [nonRecurringExpenses, setNonRecurringExpenses] = useState<
@@ -19,15 +20,13 @@ const HistoryPage: React.FC = () => {
   const lastYearDate = new Date(currentDate);
   lastYearDate.setFullYear(currentDate.getFullYear() - 1);
   const [dateStart, setDateStart] = useState<string>(
-    lastYearDate.toISOString().split("T")[0],
+    lastYearDate.toISOString().split("T")[0]
   );
   const [dateEnd, setDateEnd] = useState<string>(
-    currentDate.toISOString().split("T")[0],
+    currentDate.toISOString().split("T")[0]
   );
-  const [amountMin, setAmountMin] = useState<number>(0);
-  const [amountMax, setAmountMax] = useState<number>(10000); // just a random high value for demo
   const [filteredExpenses, setFilteredExpenses] = useState<NonRecurringEntry[]>(
-    [],
+    []
   );
   const [currentTags, setCurrentTags] = useState<string[]>([]);
   const [tags, setTags] = useState<string[]>([]);
@@ -36,20 +35,38 @@ const HistoryPage: React.FC = () => {
   const rowsPerPage = 100;
   const displayedExpenses = filteredExpenses.slice(
     (currentPage - 1) * rowsPerPage,
-    currentPage * rowsPerPage,
+    currentPage * rowsPerPage
   );
   const totalPages = Math.ceil(filteredExpenses.length / rowsPerPage);
 
   const totalExpenses = filteredExpenses.reduce(
     (acc, expense) => acc + expense.value,
-    0,
+    0
   );
+
+  const [minExpense, setMinExpense] = useState<number>(0);
+  const [maxExpense, setMaxExpense] = useState<number>(100);
+
+  const [amountRange, setAmountRange] = useState<[number, number]>([0, 100]);
 
   useEffect(() => {
     fetchNonRecurringExpenses().then((expenses) => {
       setNonRecurringExpenses(expenses);
       setFilteredExpenses(expenses);
       fetchTags().then(setTags);
+
+      if (expenses.length > 0) {
+        const minExpenseValue = Math.floor(
+          Math.min(...(expenses as { value: number }[]).map((exp) => exp.value))
+        );
+        const maxExpenseValue = Math.ceil(
+          Math.max(...(expenses as { value: number }[]).map((exp) => exp.value))
+        );
+
+        setMinExpense(minExpenseValue);
+        setMaxExpense(maxExpenseValue);
+        setAmountRange([minExpenseValue, maxExpenseValue]);
+      }
     });
   }, []);
 
@@ -59,7 +76,7 @@ const HistoryPage: React.FC = () => {
         expense.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
         (expense.tags &&
           expense.tags.some((tag) =>
-            searchTerm.toLowerCase().includes(tag.toLowerCase()),
+            searchTerm.toLowerCase().includes(tag.toLowerCase())
           ));
 
       // Updated to use some() to check if at least one tag matches
@@ -71,16 +88,16 @@ const HistoryPage: React.FC = () => {
 
       const expenseActualDate = new Date(expense.date);
       const expenseDateString = `${expenseActualDate.getUTCFullYear()}-${String(
-        expenseActualDate.getUTCMonth() + 1,
+        expenseActualDate.getUTCMonth() + 1
       ).padStart(2, "0")}-${String(expenseActualDate.getUTCDate()).padStart(
         2,
-        "0",
+        "0"
       )}`;
 
       const isValidStartDate = !dateStart || expenseDateString >= dateStart;
       const isValidEndDate = !dateEnd || expenseDateString <= dateEnd;
       const validAmount =
-        expense.value >= amountMin && expense.value <= amountMax;
+        expense.value >= amountRange[0] && expense.value <= amountRange[1];
 
       return (
         matchesSearchTerm &&
@@ -97,8 +114,7 @@ const HistoryPage: React.FC = () => {
     searchTerm,
     dateStart,
     dateEnd,
-    amountMin,
-    amountMax,
+    amountRange,
     nonRecurringExpenses,
     currentTags,
   ]);
@@ -153,29 +169,12 @@ const HistoryPage: React.FC = () => {
           />
         </InputGroup>
 
-        <InputGroup className="mb-2 mr-sm-2">
-          <div className="input-group-prepend">
-            <span className="input-group-text">Min $</span>
-          </div>
-
-          <FormControl
-            type="number"
-            value={amountMin}
-            onChange={(e) => setAmountMin(Number(e.target.value))}
-          />
-        </InputGroup>
-
-        <InputGroup className="mb-2 mr-sm-2">
-          <div className="input-group-prepend">
-            <span className="input-group-text">Max $</span>
-          </div>
-
-          <FormControl
-            type="number"
-            value={amountMax}
-            onChange={(e) => setAmountMax(Number(e.target.value))}
-          />
-        </InputGroup>
+        <AmountRangeSlider
+          minExpense={minExpense}
+          maxExpense={maxExpense}
+          amountRange={amountRange}
+          onAmountRangeChange={(range) => setAmountRange(range)}
+        />
 
         <Button variant="outline-success" className="mb-2">
           Filter
