@@ -1,5 +1,3 @@
-import { Timestamp } from "firebase/firestore";
-
 export function formatAsCurrency(value: number) {
   return new Intl.NumberFormat("en-US", {
     style: "currency",
@@ -31,7 +29,7 @@ export const shortMonths = [
 
 export type NonRecurringEntry = {
   name: string;
-  category: string;
+  tags: string[];
   date: string;
   value: number;
 };

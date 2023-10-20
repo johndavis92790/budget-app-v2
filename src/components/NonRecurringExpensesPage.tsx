@@ -4,18 +4,16 @@ import {
   fetchNonRecurringExpenses,
   updateMonthlyGoal,
   fetchCurrentGoal,
-  fetchCategories,
-  addCategory,
+  fetchTags,
+  addTag,
 } from "../utils/FirebaseHelpers";
 import {
   NonRecurringEntry,
   formatAsCurrency,
-  formatDate,
-  getLast28DaysStartDate,
   todaysDate,
 } from "../utils/Helpers";
 import { FiscalCalendar } from "./FiscalCalendar";
-import { Table } from "react-bootstrap";
+import CreatableSelect from "react-select/creatable";
 
 const NonRecurringExpensesPage: React.FC = () => {
   const [monthlyGoal, setMonthlyGoal] = useState<number>(0);
@@ -23,11 +21,10 @@ const NonRecurringExpensesPage: React.FC = () => {
     NonRecurringEntry[]
   >([]);
   const [currentExpense, setCurrentExpense] = useState<string>("");
-  const [currentCategory, setCurrentCategory] = useState<string>("");
+  const [currentTags, setCurrentTags] = useState<string[]>([]);
   const [currentDate, setCurrentDate] = useState<string>(todaysDate);
   const [currentAmount, setCurrentAmount] = useState<number | null>(null);
-  const [categories, setCategories] = useState<string[]>([]);
-  const [newCategory, setNewCategory] = useState<string>("");
+  const [tags, setTags] = useState<string[]>([]);
 
   useEffect(() => {
     fetchNonRecurringExpenses().then((expenses) => {
@@ -38,39 +35,35 @@ const NonRecurringExpensesPage: React.FC = () => {
       setMonthlyGoal(goal || 0);
     });
 
-    fetchCategories().then(setCategories);
+    fetchTags().then(setTags);
   }, []);
 
   const handleAddExpense = async (e: React.FormEvent) => {
     e.preventDefault();
-    let finalCategory;
-    if (currentCategory && newCategory) {
-      alert(
-        "Please choose either a category from the dropdown or enter a new one, not both."
-      );
+
+    if (currentTags.length === 0) {
+      alert("Please choose or enter a tag.");
       return;
-    } else if (newCategory) {
-      await addCategory(newCategory);
-      setCategories((prev) => [...prev, newCategory]);
-      finalCategory = newCategory;
-    } else if (currentCategory) {
-      finalCategory = currentCategory;
-    } else {
-      alert("Please choose a category or enter a new one.");
-      return;
+    }
+
+    const newTags = currentTags.filter((tag) => !tags.includes(tag));
+    if (newTags.length > 0) {
+      for (const tag of newTags) {
+        await addTag(tag);
+        setTags((prev) => [...prev, tag]);
+      }
     }
 
     if (
       currentExpense &&
-      finalCategory &&
+      currentTags.length > 0 &&
       currentDate &&
       currentAmount !== null
     ) {
-      // No need to convert currentDate to a Date object; use it directly
       const newExpense = {
         name: currentExpense,
-        category: finalCategory,
-        date: currentDate, // Directly use the string representation
+        tags: currentTags,
+        date: currentDate,
         value: currentAmount,
       };
 
@@ -82,7 +75,7 @@ const NonRecurringExpensesPage: React.FC = () => {
       });
 
       setCurrentExpense("");
-      setCurrentCategory("");
+      setCurrentTags([]);
       setCurrentDate(todaysDate);
       setCurrentAmount(null);
     } else {
@@ -94,6 +87,13 @@ const NonRecurringExpensesPage: React.FC = () => {
     (acc, curr) => acc + curr.value,
     0
   );
+
+  const handleTagsChange = (values: any) => {
+    const newTags = values.map((val: any) => val.value);
+    setCurrentTags(newTags);
+  };
+
+  const selectOptions = tags.map((cat) => ({ value: cat, label: cat }));
 
   return (
     <div>
@@ -110,28 +110,16 @@ const NonRecurringExpensesPage: React.FC = () => {
           onChange={(e) => setCurrentExpense(e.target.value)}
           required
         />
-        <select
-          value={currentCategory}
-          onChange={(e) => setCurrentCategory(e.target.value)}
-        >
-          <option key="Choose" value="Choose">
-            Choose
-          </option>
-          {categories.map((cat) => (
-            <option key={cat} value={cat}>
-              {cat}
-            </option>
-          ))}
-        </select>
 
-        <div>
-          <input
-            type="text"
-            value={newCategory}
-            onChange={(e) => setNewCategory(e.target.value)}
-            placeholder="Enter new category"
-          />
-        </div>
+        <CreatableSelect
+          isMulti
+          isClearable
+          onChange={handleTagsChange}
+          options={selectOptions}
+          value={currentTags.map((tag) => ({ label: tag, value: tag }))}
+          placeholder="Select or create tags..."
+        />
+
         <input
           type="date"
           value={currentDate || todaysDate}
@@ -147,44 +135,6 @@ const NonRecurringExpensesPage: React.FC = () => {
         />
         <button type="submit">Add Expense</button>
       </form>
-
-      {/* Display list of non-recurring expenses */}
-      <h2>Non-Recurring Expenses</h2>
-      <Table striped bordered hover>
-        <thead>
-          <tr>
-            <th>Name</th>
-            <th>Category</th>
-            <th>Date</th>
-            <th>Amount</th>
-          </tr>
-        </thead>
-        <tbody>
-          {nonRecurringExpenses
-            .filter((expense) => {
-              if (!expense.date) {
-                return false;
-              }
-
-              // Convert the string date to a JavaScript Date for comparison
-              const expenseDate = new Date(expense.date);
-
-              return expenseDate >= getLast28DaysStartDate();
-            })
-            .map((expense, idx) => (
-              <tr key={idx}>
-                <td>{expense.name}</td>
-                <td>{expense.category || "N/A"}</td>
-                <td className="date-column">
-                  {expense.date ? formatDate(expense.date) : "N/A"}
-                </td>
-                <td className="money-column-right-align">
-                  {formatAsCurrency(expense.value)}
-                </td>
-              </tr>
-            ))}
-        </tbody>
-      </Table>
 
       <progress
         value={

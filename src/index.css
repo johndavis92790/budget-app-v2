@@ -5,7 +5,7 @@ body {
     sans-serif;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
-}
+  }
 
 code {
   font-family: source-code-pro, Menlo, Monaco, Consolas, "Courier New",
@@ -20,3 +20,11 @@ code {
   background-color: #b5dfff !important;
 }
 
+.tag {
+  display: inline-block;
+  background-color: #e0e0e0; /* gray background */
+  padding: 2px 8px;
+  border-radius: 4px;
+  margin-right: 5px; /* spacing between tags */
+  margin-bottom: 5px; /* spacing for wrapped tags */
+}

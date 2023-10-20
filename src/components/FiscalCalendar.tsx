@@ -70,13 +70,13 @@ const getFiscalMonthEvents = (visibleDate: Date) => {
   // Find the start of the fiscal month of the visibleDate
   let fiscalStartDate = getFiscalStartDate(visibleDate);
 
-  // To cover the entire visible calendar month, generate events 
+  // To cover the entire visible calendar month, generate events
   // for the previous, current, and next fiscal month.
   for (let monthOffset = -1; monthOffset <= 1; monthOffset++) {
     let offsetDate = new Date(fiscalStartDate);
     offsetDate.setDate(fiscalStartDate.getDate() + monthOffset * 28);
     let fiscalDate = new Date(offsetDate);
-    
+
     for (let i = 0; i < 4; i++) {
       events.push({
         title: `${ordinal(i + 1)} Week`,
@@ -84,7 +84,7 @@ const getFiscalMonthEvents = (visibleDate: Date) => {
         end: new Date(
           fiscalDate.getFullYear(),
           fiscalDate.getMonth(),
-          fiscalDate.getDate() + 7
+          fiscalDate.getDate() + 7,
         ),
         allDay: true,
         weekNumber: i + 1,
@@ -99,7 +99,7 @@ const getFiscalMonthEvents = (visibleDate: Date) => {
 const getFiscalStartDate = (visibleDate: Date) => {
   const baseDate = new Date(2023, 8, 17);
   const daysDifference = Math.floor(
-    (visibleDate.getTime() - baseDate.getTime()) / (1000 * 3600 * 24)
+    (visibleDate.getTime() - baseDate.getTime()) / (1000 * 3600 * 24),
   );
   const fiscalDaysOffset = daysDifference % 28;
   const fiscalStartDate = new Date(visibleDate);
