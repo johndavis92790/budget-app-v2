@@ -6,16 +6,44 @@ interface TimeChartProps {
 }
 
 export function TimeChart(props: TimeChartProps) {
-  const getChartData = () => {
+  const getMonthlySums = (): { [key: string]: number } => {
     const monthlySums: { [key: string]: number } = {};
+
+    props.filteredExpenses.forEach((expense) => {
+      const date = new Date(expense.date);
+      const monthYearKey = `${
+        shortMonths[date.getUTCMonth()]
+      } ${date.getUTCFullYear()}`;
+      if (!monthlySums[monthYearKey]) {
+        monthlySums[monthYearKey] = 0;
+      }
+      monthlySums[monthYearKey] += expense.value;
+    });
+
+    return monthlySums;
+  };
+
+  const getMonthlyAverage = (): number => {
+    const monthlySums = getMonthlySums();
+    const totalMonths = Object.keys(monthlySums).length;
+    const totalAmount = Object.values(monthlySums).reduce(
+      (sum, value) => sum + value,
+      0
+    );
+
+    return totalAmount / totalMonths;
+  };
+
+  const getChartData = () => {
+    const monthlySums = getMonthlySums();
 
     props.filteredExpenses.forEach((expense) => {
       const date = new Date(expense.date);
 
       if (date) {
         const monthYearKey = `${
-          shortMonths[date.getMonth()]
-        } ${date.getFullYear()}`;
+          shortMonths[date.getUTCMonth()]
+        } ${date.getUTCFullYear()}`;
         if (!monthlySums[monthYearKey]) {
           monthlySums[monthYearKey] = 0;
         }
@@ -61,6 +89,9 @@ export function TimeChart(props: TimeChartProps) {
         data={getChartData()}
         options={chartOptions}
       />
+      <div className="monthly-average">
+        Monthly Average: ${getMonthlyAverage().toFixed(2)}
+      </div>
     </div>
   );
 }

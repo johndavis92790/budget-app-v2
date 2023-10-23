@@ -1,21 +1,25 @@
 import React, { useState, useEffect } from "react";
-import { fetchTags, fetchNonRecurringExpenses } from "../utils/FirebaseHelpers";
+import {
+  fetchTags,
+  fetchNonRecurringExpenses,
+  fetchCategories,
+} from "../utils/FirebaseHelpers";
 import {
   NonRecurringEntry,
   formatAsCurrency,
   formatDate,
 } from "../utils/Helpers";
-import { Table, Form, FormControl, Button, InputGroup } from "react-bootstrap";
+import { Table, Form } from "react-bootstrap";
 import { TimeChart } from "./TimeChart";
 import TablePagination from "./TablePagination";
 import Select from "react-select";
 import AmountRangeSlider from "./AmountRangeSlider";
+import DateRangeSlider from "./DateRangeSlider";
 
 const HistoryPage: React.FC = () => {
   const [nonRecurringExpenses, setNonRecurringExpenses] = useState<
     NonRecurringEntry[]
   >([]);
-  const [searchTerm, setSearchTerm] = useState<string>("");
   const currentDate = new Date();
   const lastYearDate = new Date(currentDate);
   lastYearDate.setFullYear(currentDate.getFullYear() - 1);
@@ -28,6 +32,8 @@ const HistoryPage: React.FC = () => {
   const [filteredExpenses, setFilteredExpenses] = useState<NonRecurringEntry[]>(
     []
   );
+  const [categories, setCategories] = useState<string[]>([]);
+  const [currentCategories, setCurrentCategories] = useState<string[]>([]);
   const [currentTags, setCurrentTags] = useState<string[]>([]);
   const [tags, setTags] = useState<string[]>([]);
 
@@ -53,6 +59,7 @@ const HistoryPage: React.FC = () => {
     fetchNonRecurringExpenses().then((expenses) => {
       setNonRecurringExpenses(expenses);
       setFilteredExpenses(expenses);
+      fetchCategories().then(setCategories);
       fetchTags().then(setTags);
 
       if (expenses.length > 0) {
@@ -72,51 +79,49 @@ const HistoryPage: React.FC = () => {
 
   useEffect(() => {
     const results = nonRecurringExpenses.filter((expense) => {
-      const matchesSearchTerm = expense.name
-        .toLowerCase()
-        .includes(searchTerm.toLowerCase());
-
-      // Updated to use some() to check if at least one tag matches
       const matchesTags =
         !currentTags.length ||
         expense.tags.some((tag) => currentTags.includes(tag));
 
+      const matchesCategories =
+        !currentCategories.length ||
+        currentCategories.includes(expense.category);
+
       if (!expense.date) return false;
 
-      const expenseActualDate = new Date(expense.date);
-      const expenseDateString = `${expenseActualDate.getUTCFullYear()}-${String(
-        expenseActualDate.getUTCMonth() + 1
-      ).padStart(2, "0")}-${String(expenseActualDate.getUTCDate()).padStart(
-        2,
-        "0"
-      )}`;
+      const isValidStartDate =
+        !dateStart || new Date(expense.date) >= new Date(dateStart);
+      const isValidEndDate =
+        !dateEnd || new Date(expense.date) <= new Date(dateEnd);
 
-      const isValidStartDate = !dateStart || expenseDateString >= dateStart;
-      const isValidEndDate = !dateEnd || expenseDateString <= dateEnd;
       const validAmount =
         expense.value >= amountRange[0] && expense.value <= amountRange[1];
 
       return (
-        matchesSearchTerm &&
         isValidStartDate &&
         isValidEndDate &&
         validAmount &&
-        matchesTags
+        matchesTags &&
+        matchesCategories
       );
     });
 
     setFilteredExpenses(results);
     setCurrentPage(1);
   }, [
-    searchTerm,
     dateStart,
     dateEnd,
     amountRange,
     nonRecurringExpenses,
     currentTags,
+    currentCategories,
   ]);
 
   const options = tags.map((tag) => ({ value: tag, label: tag }));
+  const categoryOptions = categories.map((category) => ({
+    value: category,
+    label: category,
+  }));
 
   return (
     <div>
@@ -124,12 +129,17 @@ const HistoryPage: React.FC = () => {
 
       {/* Search and Filters */}
       <Form className="mb-3 form-inline">
-        <FormControl
-          type="text"
-          placeholder="Search by Name"
-          className="mr-sm-2 mb-2"
-          value={searchTerm}
-          onChange={(e) => setSearchTerm(e.target.value)}
+        <Select
+          isMulti
+          options={categoryOptions}
+          value={currentCategories.map((category) => ({
+            value: category,
+            label: category,
+          }))}
+          onChange={(selected) => {
+            setCurrentCategories(selected.map((item) => item.value));
+          }}
+          placeholder="Choose categories..."
         />
 
         <Select
@@ -142,29 +152,32 @@ const HistoryPage: React.FC = () => {
           placeholder="Choose tags..."
         />
 
-        <InputGroup className="mb-2 mr-sm-2">
-          <div className="input-group-prepend">
-            <span className="input-group-text">From</span>
-          </div>
+        <DateRangeSlider
+          startDate={lastYearDate.toISOString().split("T")[0]} // or some other start boundary
+          endDate={currentDate.toISOString().split("T")[0]} // or some other end boundary
+          dateRange={[
+            (parseInt(dateStart.substr(0, 4)) - 2000) * 12 +
+              parseInt(dateStart.substr(5, 2)) -
+              1,
+            (parseInt(dateEnd.substr(0, 4)) - 2000) * 12 +
+              parseInt(dateEnd.substr(5, 2)) -
+              1,
+          ]}
+          onDateRangeChange={(range) => {
+            const startYear = Math.floor(range[0] / 12) + 2000;
+            const startMonth = (range[0] % 12) + 1;
+            setDateStart(
+              `${startYear}-${String(startMonth).padStart(2, "0")}-01`
+            );
 
-          <FormControl
-            type="date"
-            value={dateStart}
-            onChange={(e) => setDateStart(e.target.value)}
-          />
-        </InputGroup>
-
-        <InputGroup className="mb-2 mr-sm-2">
-          <div className="input-group-prepend">
-            <span className="input-group-text">To</span>
-          </div>
-
-          <FormControl
-            type="date"
-            value={dateEnd}
-            onChange={(e) => setDateEnd(e.target.value)}
-          />
-        </InputGroup>
+            const endYear = Math.floor(range[1] / 12) + 2000;
+            const endMonth = (range[1] % 12) + 1;
+            const lastDay = new Date(endYear, endMonth, 0).getDate();
+            setDateEnd(
+              `${endYear}-${String(endMonth).padStart(2, "0")}-${lastDay}`
+            );
+          }}
+        />
 
         <AmountRangeSlider
           minExpense={minExpense}
@@ -182,7 +195,7 @@ const HistoryPage: React.FC = () => {
       <Table striped bordered hover>
         <thead>
           <tr>
-            <th>Name</th>
+            <th>Category</th>
             <th>Tags</th>
             <th>Date</th>
             <th>Amount</th>
@@ -191,7 +204,7 @@ const HistoryPage: React.FC = () => {
         <tbody>
           {displayedExpenses.map((expense, idx) => (
             <tr key={idx}>
-              <td>{expense.name}</td>
+              <td>{expense.category}</td>
               <td>
                 {expense.tags.length > 0
                   ? expense.tags.map((tag, idx) => (

@@ -6,6 +6,11 @@ import {
   arrayUnion,
   arrayRemove,
   runTransaction,
+  collection,
+  addDoc,
+  getDocs,
+  query,
+  deleteDoc,
 } from "firebase/firestore";
 import { firestore } from "./firebase";
 import { RecurringEntry, NonRecurringEntry } from "./Helpers";
@@ -56,7 +61,7 @@ export const updateRecurringEntry = async (
   oldName: string,
   oldValue: number,
   newName: string,
-  newValue: number,
+  newValue: number
 ) => {
   const budgetRef = doc(firestore, "familyBudget", "budget");
   const newEntry = { name: newName, value: newValue };
@@ -74,7 +79,7 @@ export const updateRecurringEntry = async (
             .data()
             .incomes.filter(
               (entry: RecurringEntry) =>
-                entry.name !== oldName && entry.value !== oldValue,
+                entry.name !== oldName && entry.value !== oldValue
             ),
           newEntry,
         ],
@@ -86,7 +91,7 @@ export const updateRecurringEntry = async (
             .data()
             .expenses.filter(
               (entry: RecurringEntry) =>
-                entry.name !== oldName && entry.value !== oldValue,
+                entry.name !== oldName && entry.value !== oldValue
             ),
           newEntry,
         ],
@@ -98,7 +103,7 @@ export const updateRecurringEntry = async (
 export const deleteRecurringEntry = async (
   type: "income" | "expense",
   name: string,
-  value: number,
+  value: number
 ) => {
   const budgetRef = doc(firestore, "familyBudget", "budget");
 
@@ -116,51 +121,24 @@ export const deleteRecurringEntry = async (
 };
 
 export const addNonRecurringExpense = async (entry: NonRecurringEntry) => {
-  const nonRecurringRef = doc(
-    firestore,
-    "familyBudget",
-    "nonRecurringExpenses",
-  );
-  const nonRecurringSnap = await getDoc(nonRecurringRef);
-
-  if (nonRecurringSnap.exists()) {
-    await updateDoc(nonRecurringRef, {
-      expenses: arrayUnion(entry), // Directly add entry without adjustment
-    });
-  } else {
-    await setDoc(nonRecurringRef, {
-      expenses: [entry],
-    });
-  }
-};
-
-export const fetchNonRecurringExpenses = async () => {
-  const nonRecurringRef = doc(
-    firestore,
-    "familyBudget",
-    "nonRecurringExpenses",
-  );
-  const nonRecurringSnap = await getDoc(nonRecurringRef);
-  const expenses = nonRecurringSnap.data()?.expenses || [];
-
-  return expenses.map((expense: NonRecurringEntry) => {
-    // Since the date is already in the string format, there's no need for additional conversion
-    return {
-      ...expense,
-      date: expense.date, // This should be a string now
-    };
+  const nonRecurringCollection = collection(firestore, "nonRecurringExpenses");
+  await addDoc(nonRecurringCollection, {
+    ...entry,
+    type: "expense",
   });
 };
 
-export const deleteNonRecurringExpense = async (entry: NonRecurringEntry) => {
-  const nonRecurringRef = doc(
-    firestore,
-    "familyBudget",
-    "nonRecurringExpenses",
-  );
-  await updateDoc(nonRecurringRef, {
-    expenses: arrayRemove(entry),
-  });
+export const fetchNonRecurringExpenses = async (): Promise<
+  NonRecurringEntry[]
+> => {
+  const nonRecurringCollection = collection(firestore, "nonRecurringExpenses");
+  const nonRecurringSnap = await getDocs(query(nonRecurringCollection));
+  return nonRecurringSnap.docs.map((doc) => doc.data() as NonRecurringEntry);
+};
+
+export const deleteNonRecurringExpense = async (docId: string) => {
+  const nonRecurringRef = doc(firestore, "nonRecurringExpenses", docId);
+  await deleteDoc(nonRecurringRef);
 };
 
 export const fetchCurrentGoal = async (): Promise<number | null> => {
@@ -200,14 +178,14 @@ export const fetchTotalIncomeAndExpenses = async (): Promise<{
   if (data?.incomes) {
     totalIncome = data.incomes.reduce(
       (acc: number, entry: RecurringEntry) => acc + entry.value,
-      0,
+      0
     );
   }
 
   if (data?.expenses) {
     totalExpenses = data.expenses.reduce(
       (acc: number, entry: RecurringEntry) => acc + entry.value,
-      0,
+      0
     );
   }
 
@@ -234,7 +212,7 @@ export const updateTotalIncome = async (newIncome: number): Promise<void> => {
 };
 
 export const updateTotalExpenses = async (
-  newExpense: number,
+  newExpense: number
 ): Promise<void> => {
   const budgetRef = doc(firestore, "familyBudget", "budget");
   const currentData = await getDoc(budgetRef);
@@ -255,13 +233,13 @@ export const updateTotalExpenses = async (
 };
 
 export const fetchTags = async (): Promise<string[]> => {
-  const tagsRef = doc(firestore, "familyBudget", "tags");
+  const tagsRef = doc(firestore, "listItems", "tags");
   const tagsSnap = await getDoc(tagsRef);
   return tagsSnap.data()?.list || [];
 };
 
 export const addTag = async (tag: string): Promise<void> => {
-  const tagsRef = doc(firestore, "familyBudget", "tags");
+  const tagsRef = doc(firestore, "listItems", "tags");
   const tagsSnap = await getDoc(tagsRef);
   if (tagsSnap.exists()) {
     await updateDoc(tagsRef, {
@@ -270,6 +248,26 @@ export const addTag = async (tag: string): Promise<void> => {
   } else {
     await setDoc(tagsRef, {
       list: [tag],
+    });
+  }
+};
+
+export const fetchCategories = async (): Promise<string[]> => {
+  const categoriesRef = doc(firestore, "listItems", "categories");
+  const categoriesSnap = await getDoc(categoriesRef);
+  return categoriesSnap.data()?.list || [];
+};
+
+export const addCategory = async (category: string): Promise<void> => {
+  const categoriesRef = doc(firestore, "listItems", "categories");
+  const categoriesSnap = await getDoc(categoriesRef);
+  if (categoriesSnap.exists()) {
+    await updateDoc(categoriesRef, {
+      list: arrayUnion(category),
+    });
+  } else {
+    await setDoc(categoriesRef, {
+      list: [category],
     });
   }
 };

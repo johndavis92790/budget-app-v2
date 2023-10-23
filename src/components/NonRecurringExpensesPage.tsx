@@ -6,6 +6,8 @@ import {
   fetchCurrentGoal,
   fetchTags,
   addTag,
+  fetchCategories,
+  addCategory,
 } from "../utils/FirebaseHelpers";
 import {
   NonRecurringEntry,
@@ -20,7 +22,8 @@ const NonRecurringExpensesPage: React.FC = () => {
   const [nonRecurringExpenses, setNonRecurringExpenses] = useState<
     NonRecurringEntry[]
   >([]);
-  const [currentExpense, setCurrentExpense] = useState<string>("");
+  const [categories, setCategories] = useState<string[]>([]);
+  const [currentCategory, setCurrentCategory] = useState<string>("");
   const [currentTags, setCurrentTags] = useState<string[]>([]);
   const [currentDate, setCurrentDate] = useState<string>(todaysDate);
   const [currentAmount, setCurrentAmount] = useState<number | null>(null);
@@ -34,7 +37,7 @@ const NonRecurringExpensesPage: React.FC = () => {
     fetchCurrentGoal().then((goal) => {
       setMonthlyGoal(goal || 0);
     });
-
+    fetchCategories().then(setCategories);
     fetchTags().then(setTags);
   }, []);
 
@@ -55,16 +58,17 @@ const NonRecurringExpensesPage: React.FC = () => {
     }
 
     if (
-      currentExpense &&
+      currentCategory &&
       currentTags.length > 0 &&
       currentDate &&
       currentAmount !== null
     ) {
       const newExpense = {
-        name: currentExpense,
+        category: currentCategory,
         tags: currentTags,
         date: currentDate,
         value: currentAmount,
+        type: "expense",
       };
 
       addNonRecurringExpense(newExpense).then(() => {
@@ -74,7 +78,7 @@ const NonRecurringExpensesPage: React.FC = () => {
         updateMonthlyGoal(updatedGoal);
       });
 
-      setCurrentExpense("");
+      setCurrentCategory("");
       setCurrentTags([]);
       setCurrentDate(todaysDate);
       setCurrentAmount(null);
@@ -88,12 +92,37 @@ const NonRecurringExpensesPage: React.FC = () => {
     0
   );
 
-  const handleTagsChange = (values: any) => {
-    const newTags = values.map((val: any) => val.value);
-    setCurrentTags(newTags);
+  const handleOptionChange = (setter: (value: any) => void) => {
+    return (selectedOption: any) => {
+      const value = selectedOption ? selectedOption.value || "" : "";
+      setter(value);
+    };
   };
 
-  const selectOptions = tags.map((cat) => ({ value: cat, label: cat }));
+  const handleMultiOptionChange = (setter: (value: string[]) => void) => {
+    return (selectedOptions: any) => {
+      const values = selectedOptions
+        ? selectedOptions.map((opt: any) => opt.value)
+        : [];
+      setter(values);
+    };
+  };
+
+  const handleCreateItem = (
+    newItem: string,
+    existingItems: string[],
+    addFunction: (item: string) => Promise<void>,
+    setter: (value: string[] | ((prev: string[]) => string[])) => void
+  ) => {
+    if (!existingItems.includes(newItem)) {
+      addFunction(newItem).then(() => {
+        setter((prevItems) => [...prevItems, newItem]);
+      });
+    }
+  };
+
+  const categoryOptions = categories.map((cat) => ({ label: cat, value: cat }));
+  const tagOptions = tags.map((tag) => ({ label: tag, value: tag }));
 
   return (
     <div>
@@ -103,19 +132,28 @@ const NonRecurringExpensesPage: React.FC = () => {
       <FiscalCalendar />
 
       <form onSubmit={handleAddExpense}>
-        <input
-          type="text"
-          placeholder="Expense Name"
-          value={currentExpense}
-          onChange={(e) => setCurrentExpense(e.target.value)}
-          required
+        <CreatableSelect
+          onChange={handleOptionChange(setCurrentCategory)}
+          onCreateOption={(value) =>
+            handleCreateItem(value, categories, addCategory, setCategories)
+          }
+          options={categoryOptions}
+          value={
+            currentCategory
+              ? { label: currentCategory, value: currentCategory }
+              : null
+          }
+          placeholder="Select or create a category..."
         />
 
         <CreatableSelect
           isMulti
           isClearable
-          onChange={handleTagsChange}
-          options={selectOptions}
+          onChange={handleMultiOptionChange(setCurrentTags)}
+          onCreateOption={(value) =>
+            handleCreateItem(value, tags, addTag, setTags)
+          }
+          options={tagOptions}
           value={currentTags.map((tag) => ({ label: tag, value: tag }))}
           placeholder="Select or create tags..."
         />
@@ -136,6 +174,7 @@ const NonRecurringExpensesPage: React.FC = () => {
         <button type="submit">Add Expense</button>
       </form>
 
+      {/**TODO Prgress bar?? */}
       <progress
         value={
           Number.isFinite(((monthlyGoal - totalExpenses) / monthlyGoal) * 100)

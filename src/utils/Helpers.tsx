@@ -28,10 +28,11 @@ export const shortMonths = [
 ];
 
 export type NonRecurringEntry = {
-  name: string;
+  category: string;
   tags: string[];
   date: string;
   value: number;
+  type: string;
 };
 
 export type RecurringEntry = {
