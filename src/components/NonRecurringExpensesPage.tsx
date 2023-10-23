@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import {
   addNonRecurringExpense,
   fetchNonRecurringExpenses,
@@ -16,6 +16,8 @@ import {
 } from "../utils/Helpers";
 import { FiscalCalendar } from "./FiscalCalendar";
 import CreatableSelect from "react-select/creatable";
+import { Card, Button } from "react-bootstrap";
+import CurrencyInput from "./CurrencyInput";
 
 const NonRecurringExpensesPage: React.FC = () => {
   const [monthlyGoal, setMonthlyGoal] = useState<number>(0);
@@ -89,7 +91,7 @@ const NonRecurringExpensesPage: React.FC = () => {
 
   const totalExpenses = nonRecurringExpenses.reduce(
     (acc, curr) => acc + curr.value,
-    0
+    0,
   );
 
   const handleOptionChange = (setter: (value: any) => void) => {
@@ -112,7 +114,7 @@ const NonRecurringExpensesPage: React.FC = () => {
     newItem: string,
     existingItems: string[],
     addFunction: (item: string) => Promise<void>,
-    setter: (value: string[] | ((prev: string[]) => string[])) => void
+    setter: (value: string[] | ((prev: string[]) => string[])) => void,
   ) => {
     if (!existingItems.includes(newItem)) {
       addFunction(newItem).then(() => {
@@ -124,57 +126,18 @@ const NonRecurringExpensesPage: React.FC = () => {
   const categoryOptions = categories.map((cat) => ({ label: cat, value: cat }));
   const tagOptions = tags.map((tag) => ({ label: tag, value: tag }));
 
+  const handleCurrencyChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    // Strip out all non-numeric characters except for the decimal point
+    const value = e.target.value.replace(/[^\d.]/g, "");
+    setCurrentAmount(Number(value));
+  };
+
   return (
     <div>
       <h1>Non-Recurring Expenses</h1>
       <h2>Current Monthly Goal: {formatAsCurrency(monthlyGoal)}</h2>
 
-      <FiscalCalendar />
-
-      <form onSubmit={handleAddExpense}>
-        <CreatableSelect
-          onChange={handleOptionChange(setCurrentCategory)}
-          onCreateOption={(value) =>
-            handleCreateItem(value, categories, addCategory, setCategories)
-          }
-          options={categoryOptions}
-          value={
-            currentCategory
-              ? { label: currentCategory, value: currentCategory }
-              : null
-          }
-          placeholder="Select or create a category..."
-        />
-
-        <CreatableSelect
-          isMulti
-          isClearable
-          onChange={handleMultiOptionChange(setCurrentTags)}
-          onCreateOption={(value) =>
-            handleCreateItem(value, tags, addTag, setTags)
-          }
-          options={tagOptions}
-          value={currentTags.map((tag) => ({ label: tag, value: tag }))}
-          placeholder="Select or create tags..."
-        />
-
-        <input
-          type="date"
-          value={currentDate || todaysDate}
-          onChange={(e) => setCurrentDate(e.target.value)}
-          required
-        />
-        <input
-          type="number"
-          placeholder="Amount"
-          value={currentAmount || ""}
-          onChange={(e) => setCurrentAmount(Number(e.target.value))}
-          required
-        />
-        <button type="submit">Add Expense</button>
-      </form>
-
-      {/**TODO Prgress bar?? */}
+      {/* TODO Progress bar?? */}
       <progress
         value={
           Number.isFinite(((monthlyGoal - totalExpenses) / monthlyGoal) * 100)
@@ -183,6 +146,78 @@ const NonRecurringExpensesPage: React.FC = () => {
         }
         max="100"
       ></progress>
+
+      <FiscalCalendar />
+
+      <Card className="mb-4">
+        <Card.Body>
+          <form onSubmit={handleAddExpense}>
+            <CreatableSelect
+              onChange={handleOptionChange(setCurrentCategory)}
+              onCreateOption={(value) =>
+                handleCreateItem(value, categories, addCategory, setCategories)
+              }
+              options={categoryOptions}
+              value={
+                currentCategory
+                  ? { label: currentCategory, value: currentCategory }
+                  : null
+              }
+              placeholder="Select or create a category..."
+              className="mb-3"
+            />
+            <CreatableSelect
+              isMulti
+              isClearable
+              onChange={handleMultiOptionChange(setCurrentTags)}
+              onCreateOption={(value) =>
+                handleCreateItem(value, tags, addTag, setTags)
+              }
+              options={tagOptions}
+              value={currentTags.map((tag) => ({ label: tag, value: tag }))}
+              placeholder="Select or create tags..."
+              className="mb-3"
+            />
+            <input
+              type="date"
+              value={currentDate || todaysDate}
+              onChange={(e) => setCurrentDate(e.target.value)}
+              required
+              className="form-control mb-3"
+            />
+            <div className="d-flex justify-content-center align-items-center mb-3">
+              <label
+                htmlFor="expense-num-input"
+                style={{ marginRight: "12px" }}
+              >
+                Amount
+              </label>
+              <CurrencyInput
+                autoComplete="off"
+                placeholder="$0.00"
+                size="4"
+                type="text"
+                id="expense-num-input"
+                name="expense-num"
+                className="num-input form-control"
+                onChange={handleCurrencyChange}
+                style={{ maxWidth: "100px", textAlign: "right" }}
+                onFocus={(e: React.FocusEvent<HTMLInputElement>) =>
+                  e.target.setSelectionRange(
+                    e.target.value.length,
+                    e.target.value.length,
+                  )
+                }
+              />
+            </div>
+            <div className="d-flex justify-content-end">
+              <Button variant="danger" type="submit">
+                Expense
+              </Button>
+            </div>
+          </form>
+        </Card.Body>
+      </Card>
     </div>
   );
 };

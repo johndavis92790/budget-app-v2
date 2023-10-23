@@ -28,7 +28,7 @@ export function TimeChart(props: TimeChartProps) {
     const totalMonths = Object.keys(monthlySums).length;
     const totalAmount = Object.values(monthlySums).reduce(
       (sum, value) => sum + value,
-      0
+      0,
     );
 
     return totalAmount / totalMonths;

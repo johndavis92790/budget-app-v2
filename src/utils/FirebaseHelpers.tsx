@@ -61,7 +61,7 @@ export const updateRecurringEntry = async (
   oldName: string,
   oldValue: number,
   newName: string,
-  newValue: number
+  newValue: number,
 ) => {
   const budgetRef = doc(firestore, "familyBudget", "budget");
   const newEntry = { name: newName, value: newValue };
@@ -79,7 +79,7 @@ export const updateRecurringEntry = async (
             .data()
             .incomes.filter(
               (entry: RecurringEntry) =>
-                entry.name !== oldName && entry.value !== oldValue
+                entry.name !== oldName && entry.value !== oldValue,
             ),
           newEntry,
         ],
@@ -91,7 +91,7 @@ export const updateRecurringEntry = async (
             .data()
             .expenses.filter(
               (entry: RecurringEntry) =>
-                entry.name !== oldName && entry.value !== oldValue
+                entry.name !== oldName && entry.value !== oldValue,
             ),
           newEntry,
         ],
@@ -103,7 +103,7 @@ export const updateRecurringEntry = async (
 export const deleteRecurringEntry = async (
   type: "income" | "expense",
   name: string,
-  value: number
+  value: number,
 ) => {
   const budgetRef = doc(firestore, "familyBudget", "budget");
 
@@ -178,14 +178,14 @@ export const fetchTotalIncomeAndExpenses = async (): Promise<{
   if (data?.incomes) {
     totalIncome = data.incomes.reduce(
       (acc: number, entry: RecurringEntry) => acc + entry.value,
-      0
+      0,
     );
   }
 
   if (data?.expenses) {
     totalExpenses = data.expenses.reduce(
       (acc: number, entry: RecurringEntry) => acc + entry.value,
-      0
+      0,
     );
   }
 
@@ -212,7 +212,7 @@ export const updateTotalIncome = async (newIncome: number): Promise<void> => {
 };
 
 export const updateTotalExpenses = async (
-  newExpense: number
+  newExpense: number,
 ): Promise<void> => {
   const budgetRef = doc(firestore, "familyBudget", "budget");
   const currentData = await getDoc(budgetRef);

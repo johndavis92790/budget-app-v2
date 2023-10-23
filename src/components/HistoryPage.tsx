@@ -24,13 +24,13 @@ const HistoryPage: React.FC = () => {
   const lastYearDate = new Date(currentDate);
   lastYearDate.setFullYear(currentDate.getFullYear() - 1);
   const [dateStart, setDateStart] = useState<string>(
-    lastYearDate.toISOString().split("T")[0]
+    lastYearDate.toISOString().split("T")[0],
   );
   const [dateEnd, setDateEnd] = useState<string>(
-    currentDate.toISOString().split("T")[0]
+    currentDate.toISOString().split("T")[0],
   );
   const [filteredExpenses, setFilteredExpenses] = useState<NonRecurringEntry[]>(
-    []
+    [],
   );
   const [categories, setCategories] = useState<string[]>([]);
   const [currentCategories, setCurrentCategories] = useState<string[]>([]);
@@ -41,13 +41,13 @@ const HistoryPage: React.FC = () => {
   const rowsPerPage = 100;
   const displayedExpenses = filteredExpenses.slice(
     (currentPage - 1) * rowsPerPage,
-    currentPage * rowsPerPage
+    currentPage * rowsPerPage,
   );
   const totalPages = Math.ceil(filteredExpenses.length / rowsPerPage);
 
   const totalExpenses = filteredExpenses.reduce(
     (acc, expense) => acc + expense.value,
-    0
+    0,
   );
 
   const [minExpense, setMinExpense] = useState<number>(0);
@@ -64,10 +64,14 @@ const HistoryPage: React.FC = () => {
 
       if (expenses.length > 0) {
         const minExpenseValue = Math.floor(
-          Math.min(...(expenses as { value: number }[]).map((exp) => exp.value))
+          Math.min(
+            ...(expenses as { value: number }[]).map((exp) => exp.value),
+          ),
         );
         const maxExpenseValue = Math.ceil(
-          Math.max(...(expenses as { value: number }[]).map((exp) => exp.value))
+          Math.max(
+            ...(expenses as { value: number }[]).map((exp) => exp.value),
+          ),
         );
 
         setMinExpense(minExpenseValue);
@@ -167,14 +171,14 @@ const HistoryPage: React.FC = () => {
             const startYear = Math.floor(range[0] / 12) + 2000;
             const startMonth = (range[0] % 12) + 1;
             setDateStart(
-              `${startYear}-${String(startMonth).padStart(2, "0")}-01`
+              `${startYear}-${String(startMonth).padStart(2, "0")}-01`,
             );
 
             const endYear = Math.floor(range[1] / 12) + 2000;
             const endMonth = (range[1] % 12) + 1;
             const lastDay = new Date(endYear, endMonth, 0).getDate();
             setDateEnd(
-              `${endYear}-${String(endMonth).padStart(2, "0")}-${lastDay}`
+              `${endYear}-${String(endMonth).padStart(2, "0")}-${lastDay}`,
             );
           }}
         />
