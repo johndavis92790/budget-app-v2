@@ -28,3 +28,8 @@ code {
   margin-right: 5px; /* spacing between tags */
   margin-bottom: 5px; /* spacing for wrapped tags */
 }
+
+/* HistoryPage.css */
+.small-font-table {
+  font-size: 12px; /* Adjust the value as per your preference */
+}

@@ -128,17 +128,40 @@ export const addNonRecurringExpense = async (entry: NonRecurringEntry) => {
   });
 };
 
+export const addNonRecurringRefund = async (entry: NonRecurringEntry) => {
+  const nonRecurringCollection = collection(firestore, "nonRecurringExpenses");
+  await addDoc(nonRecurringCollection, {
+    ...entry,
+    type: "refund",
+  });
+};
+
 export const fetchNonRecurringExpenses = async (): Promise<
   NonRecurringEntry[]
 > => {
   const nonRecurringCollection = collection(firestore, "nonRecurringExpenses");
   const nonRecurringSnap = await getDocs(query(nonRecurringCollection));
-  return nonRecurringSnap.docs.map((doc) => doc.data() as NonRecurringEntry);
+
+  return nonRecurringSnap.docs.map(
+    (doc) => ({ docId: doc.id, ...doc.data() }) as NonRecurringEntry,
+  );
 };
 
 export const deleteNonRecurringExpense = async (docId: string) => {
   const nonRecurringRef = doc(firestore, "nonRecurringExpenses", docId);
   await deleteDoc(nonRecurringRef);
+};
+
+export const updateNonRecurringExpense = async (
+  docId: string,
+  entry: NonRecurringEntry,
+) => {
+  const nonRecurringRef = doc(firestore, "nonRecurringExpenses", docId);
+
+  // Exclude the docId from the entry since it's not needed in the database record.
+  const { docId: _, ...entryData } = entry;
+
+  await updateDoc(nonRecurringRef, entryData);
 };
 
 export const fetchCurrentGoal = async (): Promise<number | null> => {

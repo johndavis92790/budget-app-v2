@@ -17,7 +17,9 @@ export function TimeChart(props: TimeChartProps) {
       if (!monthlySums[monthYearKey]) {
         monthlySums[monthYearKey] = 0;
       }
-      monthlySums[monthYearKey] += expense.value;
+      // If the type is "expense", add the value. If "refund", subtract the value.
+      monthlySums[monthYearKey] +=
+        expense.type === "expense" ? expense.value : -expense.value;
     });
 
     return monthlySums;
@@ -36,20 +38,6 @@ export function TimeChart(props: TimeChartProps) {
 
   const getChartData = () => {
     const monthlySums = getMonthlySums();
-
-    props.filteredExpenses.forEach((expense) => {
-      const date = new Date(expense.date);
-
-      if (date) {
-        const monthYearKey = `${
-          shortMonths[date.getUTCMonth()]
-        } ${date.getUTCFullYear()}`;
-        if (!monthlySums[monthYearKey]) {
-          monthlySums[monthYearKey] = 0;
-        }
-        monthlySums[monthYearKey] += expense.value;
-      }
-    });
 
     const sortedEntries = Object.entries(monthlySums).sort((a, b) => {
       const monthA = shortMonths.indexOf(a[0].split(" ")[0]);

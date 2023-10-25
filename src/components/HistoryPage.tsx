@@ -1,42 +1,55 @@
 import React, { useState, useEffect } from "react";
 import {
-  fetchTags,
-  fetchNonRecurringExpenses,
-  fetchCategories,
+  addNonRecurringExpense,
+  updateNonRecurringExpense,
 } from "../utils/FirebaseHelpers";
-import {
-  NonRecurringEntry,
-  formatAsCurrency,
-  formatDate,
-} from "../utils/Helpers";
-import { Table, Form } from "react-bootstrap";
+import { NonRecurringEntry } from "../utils/Helpers";
 import { TimeChart } from "./TimeChart";
 import TablePagination from "./TablePagination";
-import Select from "react-select";
-import AmountRangeSlider from "./AmountRangeSlider";
-import DateRangeSlider from "./DateRangeSlider";
+import ExpensesTable from "./ExpensesTable";
+import FiltersComponent from "./FiltersComponent";
+import ExpenseModal from "./ExpenseModal";
+import { useExpensesData } from "../utils/hooks/useExpensesData";
+import { useCategoriesAndTags } from "../utils/hooks/useCategoriesAndTags";
 
 const HistoryPage: React.FC = () => {
-  const [nonRecurringExpenses, setNonRecurringExpenses] = useState<
-    NonRecurringEntry[]
-  >([]);
+  const { nonRecurringExpenses, minExpense, maxExpense } = useExpensesData();
+  const { categories, tags } = useCategoriesAndTags();
+
+  // Date-related states
   const currentDate = new Date();
-  const lastYearDate = new Date(currentDate);
-  lastYearDate.setFullYear(currentDate.getFullYear() - 1);
+  const lastYearDate = new Date(
+    currentDate.getFullYear() - 1,
+    currentDate.getMonth(),
+    currentDate.getDate(),
+  );
   const [dateStart, setDateStart] = useState<string>(
     lastYearDate.toISOString().split("T")[0],
   );
   const [dateEnd, setDateEnd] = useState<string>(
     currentDate.toISOString().split("T")[0],
   );
+
+  // Filter-related states
   const [filteredExpenses, setFilteredExpenses] = useState<NonRecurringEntry[]>(
     [],
   );
-  const [categories, setCategories] = useState<string[]>([]);
   const [currentCategories, setCurrentCategories] = useState<string[]>([]);
   const [currentTags, setCurrentTags] = useState<string[]>([]);
-  const [tags, setTags] = useState<string[]>([]);
+  const [amountRange, setAmountRange] = useState<[number, number]>([
+    minExpense,
+    maxExpense,
+  ]);
 
+  // Modal states
+  const [showModal, setShowModal] = useState(false);
+  const [selectedExpense, setSelectedExpense] =
+    useState<NonRecurringEntry | null>(null);
+  const [editExpense, setEditExpense] = useState<NonRecurringEntry | null>(
+    null,
+  );
+
+  // Pagination states
   const [currentPage, setCurrentPage] = useState(1);
   const rowsPerPage = 100;
   const displayedExpenses = filteredExpenses.slice(
@@ -45,42 +58,19 @@ const HistoryPage: React.FC = () => {
   );
   const totalPages = Math.ceil(filteredExpenses.length / rowsPerPage);
 
+  // Other constants
   const totalExpenses = filteredExpenses.reduce(
-    (acc, expense) => acc + expense.value,
+    (acc, expense) =>
+      expense.type === "expense" ? acc + expense.value : acc - expense.value,
     0,
   );
+  const options = tags.map((tag: string) => ({ value: tag, label: tag }));
+  const categoryOptions = categories.map((category: string) => ({
+    value: category,
+    label: category,
+  }));
 
-  const [minExpense, setMinExpense] = useState<number>(0);
-  const [maxExpense, setMaxExpense] = useState<number>(100);
-
-  const [amountRange, setAmountRange] = useState<[number, number]>([0, 100]);
-
-  useEffect(() => {
-    fetchNonRecurringExpenses().then((expenses) => {
-      setNonRecurringExpenses(expenses);
-      setFilteredExpenses(expenses);
-      fetchCategories().then(setCategories);
-      fetchTags().then(setTags);
-
-      if (expenses.length > 0) {
-        const minExpenseValue = Math.floor(
-          Math.min(
-            ...(expenses as { value: number }[]).map((exp) => exp.value),
-          ),
-        );
-        const maxExpenseValue = Math.ceil(
-          Math.max(
-            ...(expenses as { value: number }[]).map((exp) => exp.value),
-          ),
-        );
-
-        setMinExpense(minExpenseValue);
-        setMaxExpense(maxExpenseValue);
-        setAmountRange([minExpenseValue, maxExpenseValue]);
-      }
-    });
-  }, []);
-
+  // Effects
   useEffect(() => {
     const results = nonRecurringExpenses.filter((expense) => {
       const matchesTags =
@@ -121,113 +111,87 @@ const HistoryPage: React.FC = () => {
     currentCategories,
   ]);
 
-  const options = tags.map((tag) => ({ value: tag, label: tag }));
-  const categoryOptions = categories.map((category) => ({
-    value: category,
-    label: category,
-  }));
+  const handleSaveChanges = async () => {
+    try {
+      if (editExpense) {
+        if (editExpense.docId) {
+          await updateNonRecurringExpense(editExpense.docId, editExpense);
+        } else {
+          await addNonRecurringExpense(editExpense);
+        }
+        handleCloseModal();
+      } else {
+        console.error("No expense selected for editing");
+      }
+    } catch (error) {
+      console.error("Failed to save changes:", error);
+    }
+  };
+
+  const handleCurrencyChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const value = e.target.value.replace(/[^\d.]/g, "");
+    setEditExpense((prev) => ({
+      ...prev!,
+      value: Number(value),
+    }));
+  };
+
+  const handleShowModal = (expense: NonRecurringEntry) => {
+    setSelectedExpense(expense);
+    setEditExpense({ ...expense });
+    setShowModal(true);
+  };
+
+  const handleCloseModal = () => {
+    setSelectedExpense(null);
+    setEditExpense(null);
+    setShowModal(false);
+  };
 
   return (
     <div>
+      <ExpenseModal
+        showModal={showModal}
+        handleCloseModal={handleCloseModal}
+        editExpense={editExpense}
+        setEditExpense={setEditExpense}
+        handleSaveChanges={handleSaveChanges}
+        categoryOptions={categoryOptions}
+        options={options}
+        handleCurrencyChange={handleCurrencyChange}
+        selectedExpense={selectedExpense}
+      />
+
       <h1>Expense History</h1>
 
-      {/* Search and Filters */}
-      <Form className="mb-3 form-inline">
-        <Select
-          isMulti
-          options={categoryOptions}
-          value={currentCategories.map((category) => ({
-            value: category,
-            label: category,
-          }))}
-          onChange={(selected) => {
-            setCurrentCategories(selected.map((item) => item.value));
-          }}
-          placeholder="Choose categories..."
-        />
-
-        <Select
-          isMulti
-          options={options}
-          value={currentTags.map((tag) => ({ value: tag, label: tag }))}
-          onChange={(selected) => {
-            setCurrentTags(selected.map((item) => item.value));
-          }}
-          placeholder="Choose tags..."
-        />
-
-        <DateRangeSlider
-          startDate={lastYearDate.toISOString().split("T")[0]} // or some other start boundary
-          endDate={currentDate.toISOString().split("T")[0]} // or some other end boundary
-          dateRange={[
-            (parseInt(dateStart.substr(0, 4)) - 2000) * 12 +
-              parseInt(dateStart.substr(5, 2)) -
-              1,
-            (parseInt(dateEnd.substr(0, 4)) - 2000) * 12 +
-              parseInt(dateEnd.substr(5, 2)) -
-              1,
-          ]}
-          onDateRangeChange={(range) => {
-            const startYear = Math.floor(range[0] / 12) + 2000;
-            const startMonth = (range[0] % 12) + 1;
-            setDateStart(
-              `${startYear}-${String(startMonth).padStart(2, "0")}-01`,
-            );
-
-            const endYear = Math.floor(range[1] / 12) + 2000;
-            const endMonth = (range[1] % 12) + 1;
-            const lastDay = new Date(endYear, endMonth, 0).getDate();
-            setDateEnd(
-              `${endYear}-${String(endMonth).padStart(2, "0")}-${lastDay}`,
-            );
-          }}
-        />
-
-        <AmountRangeSlider
-          minExpense={minExpense}
-          maxExpense={maxExpense}
-          amountRange={amountRange}
-          onAmountRangeChange={(range) => setAmountRange(range)}
-        />
-      </Form>
+      <FiltersComponent
+        tags={tags}
+        categories={categories}
+        currentTags={currentTags}
+        currentCategories={currentCategories}
+        setCurrentTags={setCurrentTags}
+        setCurrentCategories={setCurrentCategories}
+        dateStart={dateStart}
+        dateEnd={dateEnd}
+        setDateStart={setDateStart}
+        setDateEnd={setDateEnd}
+        minExpense={minExpense}
+        maxExpense={maxExpense}
+        amountRange={amountRange}
+        setAmountRange={setAmountRange}
+        lastYearDate={lastYearDate}
+        currentDate={currentDate}
+      />
 
       <TimeChart filteredExpenses={filteredExpenses}></TimeChart>
 
       <div className="total-expenses">Total: ${totalExpenses.toFixed(2)}</div>
 
-      {/* Table */}
-      <Table striped bordered hover>
-        <thead>
-          <tr>
-            <th>Category</th>
-            <th>Tags</th>
-            <th>Date</th>
-            <th>Amount</th>
-          </tr>
-        </thead>
-        <tbody>
-          {displayedExpenses.map((expense, idx) => (
-            <tr key={idx}>
-              <td>{expense.category}</td>
-              <td>
-                {expense.tags.length > 0
-                  ? expense.tags.map((tag, idx) => (
-                      <span key={idx} className="tag">
-                        {tag}
-                      </span>
-                    ))
-                  : "N/A"}
-              </td>
-              <td className="date-column">
-                {expense.date ? formatDate(expense.date) : "N/A"}
-              </td>
-              <td className="money-column-right-align">
-                {formatAsCurrency(expense.value)}
-              </td>
-            </tr>
-          ))}
-        </tbody>
-      </Table>
+      <ExpensesTable
+        displayedExpenses={displayedExpenses}
+        handleShowModal={handleShowModal}
+      />
+
       <TablePagination
         currentPage={currentPage}
         totalPages={totalPages}

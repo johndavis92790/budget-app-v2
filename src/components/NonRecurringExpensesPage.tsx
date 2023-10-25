@@ -1,92 +1,44 @@
-import React, { useState, useEffect, useRef } from "react";
-import {
-  addNonRecurringExpense,
-  fetchNonRecurringExpenses,
-  updateMonthlyGoal,
-  fetchCurrentGoal,
-  fetchTags,
-  addTag,
-  fetchCategories,
-  addCategory,
-} from "../utils/FirebaseHelpers";
-import {
-  NonRecurringEntry,
-  formatAsCurrency,
-  todaysDate,
-} from "../utils/Helpers";
+import React, { useState } from "react";
+import { addTag } from "../utils/FirebaseHelpers";
+import { formatAsCurrency, handleNewEntry, todaysDate } from "../utils/Helpers";
 import { FiscalCalendar } from "./FiscalCalendar";
-import CreatableSelect from "react-select/creatable";
-import { Card, Button } from "react-bootstrap";
-import CurrencyInput from "./CurrencyInput";
+import ExpenseRefundCard from "./ExpenseRefundCard";
+import { useExpensesData } from "../utils/hooks/useExpensesData";
+import { useCategoriesAndTags } from "../utils/hooks/useCategoriesAndTags";
+import { useGoals } from "../utils/hooks/useGoals";
 
 const NonRecurringExpensesPage: React.FC = () => {
-  const [monthlyGoal, setMonthlyGoal] = useState<number>(0);
-  const [nonRecurringExpenses, setNonRecurringExpenses] = useState<
-    NonRecurringEntry[]
-  >([]);
-  const [categories, setCategories] = useState<string[]>([]);
+  const { nonRecurringExpenses, setNonRecurringExpenses } = useExpensesData();
+  const { categories, setCategories, tags, setTags } = useCategoriesAndTags();
+  const { monthlyGoal, setMonthlyGoal } = useGoals();
+
   const [currentCategory, setCurrentCategory] = useState<string>("");
   const [currentTags, setCurrentTags] = useState<string[]>([]);
   const [currentDate, setCurrentDate] = useState<string>(todaysDate);
   const [currentAmount, setCurrentAmount] = useState<number | null>(null);
-  const [tags, setTags] = useState<string[]>([]);
+  const [currentNotes, setCurrentNotes] = useState<string>("");
 
-  useEffect(() => {
-    fetchNonRecurringExpenses().then((expenses) => {
-      setNonRecurringExpenses(expenses);
-    });
-
-    fetchCurrentGoal().then((goal) => {
-      setMonthlyGoal(goal || 0);
-    });
-    fetchCategories().then(setCategories);
-    fetchTags().then(setTags);
-  }, []);
-
-  const handleAddExpense = async (e: React.FormEvent) => {
-    e.preventDefault();
-
-    if (currentTags.length === 0) {
-      alert("Please choose or enter a tag.");
-      return;
-    }
-
-    const newTags = currentTags.filter((tag) => !tags.includes(tag));
-    if (newTags.length > 0) {
-      for (const tag of newTags) {
-        await addTag(tag);
-        setTags((prev) => [...prev, tag]);
-      }
-    }
-
-    if (
-      currentCategory &&
-      currentTags.length > 0 &&
-      currentDate &&
-      currentAmount !== null
-    ) {
-      const newExpense = {
-        category: currentCategory,
-        tags: currentTags,
-        date: currentDate,
-        value: currentAmount,
-        type: "expense",
-      };
-
-      addNonRecurringExpense(newExpense).then(() => {
-        setNonRecurringExpenses((prev) => [...prev, newExpense]);
-        const updatedGoal = monthlyGoal - currentAmount;
-        setMonthlyGoal(updatedGoal);
-        updateMonthlyGoal(updatedGoal);
-      });
-
-      setCurrentCategory("");
-      setCurrentTags([]);
-      setCurrentDate(todaysDate);
-      setCurrentAmount(null);
-    } else {
-      alert("Please ensure all fields are filled in.");
-    }
+  const handleAddEntry = async (type: "expense" | "refund") => {
+    handleNewEntry(
+      type,
+      currentTags,
+      tags,
+      setTags,
+      currentCategory,
+      categories,
+      setCategories,
+      currentDate,
+      currentAmount,
+      currentNotes,
+      setMonthlyGoal,
+      setNonRecurringExpenses,
+      monthlyGoal,
+      setCurrentCategory,
+      setCurrentTags,
+      setCurrentDate,
+      setCurrentAmount,
+      setCurrentNotes,
+    );
   };
 
   const totalExpenses = nonRecurringExpenses.reduce(
@@ -123,9 +75,6 @@ const NonRecurringExpensesPage: React.FC = () => {
     }
   };
 
-  const categoryOptions = categories.map((cat) => ({ label: cat, value: cat }));
-  const tagOptions = tags.map((tag) => ({ label: tag, value: tag }));
-
   const handleCurrencyChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     // Strip out all non-numeric characters except for the decimal point
     const value = e.target.value.replace(/[^\d.]/g, "");
@@ -149,75 +98,26 @@ const NonRecurringExpensesPage: React.FC = () => {
 
       <FiscalCalendar />
 
-      <Card className="mb-4">
-        <Card.Body>
-          <form onSubmit={handleAddExpense}>
-            <CreatableSelect
-              onChange={handleOptionChange(setCurrentCategory)}
-              onCreateOption={(value) =>
-                handleCreateItem(value, categories, addCategory, setCategories)
-              }
-              options={categoryOptions}
-              value={
-                currentCategory
-                  ? { label: currentCategory, value: currentCategory }
-                  : null
-              }
-              placeholder="Select or create a category..."
-              className="mb-3"
-            />
-            <CreatableSelect
-              isMulti
-              isClearable
-              onChange={handleMultiOptionChange(setCurrentTags)}
-              onCreateOption={(value) =>
-                handleCreateItem(value, tags, addTag, setTags)
-              }
-              options={tagOptions}
-              value={currentTags.map((tag) => ({ label: tag, value: tag }))}
-              placeholder="Select or create tags..."
-              className="mb-3"
-            />
-            <input
-              type="date"
-              value={currentDate || todaysDate}
-              onChange={(e) => setCurrentDate(e.target.value)}
-              required
-              className="form-control mb-3"
-            />
-            <div className="d-flex justify-content-center align-items-center mb-3">
-              <label
-                htmlFor="expense-num-input"
-                style={{ marginRight: "12px" }}
-              >
-                Amount
-              </label>
-              <CurrencyInput
-                autoComplete="off"
-                placeholder="$0.00"
-                size="4"
-                type="text"
-                id="expense-num-input"
-                name="expense-num"
-                className="num-input form-control"
-                onChange={handleCurrencyChange}
-                style={{ maxWidth: "100px", textAlign: "right" }}
-                onFocus={(e: React.FocusEvent<HTMLInputElement>) =>
-                  e.target.setSelectionRange(
-                    e.target.value.length,
-                    e.target.value.length,
-                  )
-                }
-              />
-            </div>
-            <div className="d-flex justify-content-end">
-              <Button variant="danger" type="submit">
-                Expense
-              </Button>
-            </div>
-          </form>
-        </Card.Body>
-      </Card>
+      <ExpenseRefundCard
+        categories={categories}
+        tags={tags}
+        handleAddEntry={handleAddEntry}
+        handleOptionChange={handleOptionChange}
+        handleMultiOptionChange={handleMultiOptionChange}
+        handleCreateItem={handleCreateItem}
+        handleCurrencyChange={handleCurrencyChange}
+        currentCategory={currentCategory}
+        currentTags={currentTags}
+        currentDate={currentDate}
+        currentAmount={currentAmount}
+        setCurrentCategory={setCurrentCategory}
+        setCurrentTags={setCurrentTags}
+        addTag={addTag}
+        setTags={setTags}
+        todaysDate={todaysDate}
+        setCurrentDate={setCurrentDate}
+        setCurrentNotes={setCurrentNotes}
+      />
     </div>
   );
 };
