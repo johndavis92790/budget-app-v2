@@ -18,12 +18,13 @@ import {
 } from "firebase/firestore";
 import { firestore } from "./firebase";
 import { RecurringEntry, NonRecurringEntry, ordinal } from "./Helpers";
-import { FiscalMonthEvent } from "../components/FiscalCalendar";
 
 export interface WeekData {
   weekNumber: number;
   start: string;
+  startDate?: Date;
   end: string;
+  endDate?: Date;
   title: string;
   allDay: boolean;
   docId?: string;
@@ -51,119 +52,27 @@ export interface YearData {
   monthStrings: string[];
   weeks?: DocumentReference[];
   weekStrings: string[];
-  weekEvents?: WeekData[];
   docId?: string;
 }
 
-export const addFiscalMonthToFirestore = async (monthData: MonthData) => {
-  try {
-    // Generate the document ID
-    const docId = `${monthData.startDate}_${monthData.endDate}`;
-
-    // Set the document with the specified ID
-    const docRef = doc(firestore, "fiscalMonths", docId);
-    await setDoc(docRef, monthData);
-
-    console.log("Document written with ID: ", docRef.id);
-  } catch (e) {
-    console.error("Error adding document: ", e);
-  }
-};
-
-export const addFiscalYearToFirestore = async (yearData: YearData) => {
-  try {
-    // Generate the document ID
-    const docId = `${yearData.year}`;
-
-    // Set the document with the specified ID
-    const docRef = doc(firestore, "fiscalYears", docId);
-    await setDoc(docRef, yearData);
-
-    console.log("Document written with ID: ", docRef.id);
-  } catch (e) {
-    console.error("Error adding document: ", e);
-  }
-};
-
-export const fetchFiscalYearData = async (
-  date: string,
-): Promise<YearData | null> => {
-  const fiscalYearsCollection = collection(firestore, "fiscalYears");
-  const queryYear = query(
-    fiscalYearsCollection,
-    where("year", "==", date),
-  );
-  const querySnapshot = await getDocs(queryYear);
-  const fetchedYear: YearData[] = [];
-  querySnapshot.forEach((doc) => {
-    const eventData = doc.data() as any;
-    fetchedYear.push(eventData);
-  });
-  if (fetchedYear.length === 1){
-    return fetchedYear[0];
-  } else {
-    return null
-  }
-};
-
-export const fetchFiscalMonthData = async (date: Date) => {
-  const fiscalMonthsCollection = "fiscalMonths"; // Collection name
-  const docID = `${date.toISOString().split("T")[0]}_${
-    new Date(date.getFullYear(), date.getMonth() + 1, 0)
-      .toISOString()
-      .split("T")[0]
-  }`;
-  console.log(docID);
-  const docRef = doc(firestore, fiscalMonthsCollection, docID);
-  const docData = await getDoc(docRef);
-
-  if (docData.exists()) {
-    console.log("Fetched data: ", docData.data());
-    return docData.data();
-  } else {
-    return null;
-  }
-};
-
 export const fetchFiscalWeekEvents = async (
-  date: Date,
-): Promise<FiscalMonthEvent[]> => {
-  // Define the range for the visible month
-  const startOfMonthStr = `${date.getFullYear()}-${String(
-    date.getMonth() + 1,
-  ).padStart(2, "0")}-01`;
-  const endOfMonth = new Date(date.getFullYear(), date.getMonth() + 1, 0);
-  const endOfMonthStr = `${date.getFullYear()}-${String(
-    date.getMonth() + 1,
-  ).padStart(2, "0")}-${endOfMonth.getDate()}`;
+  years: string[] // Now accepts an array of year strings
+): Promise<WeekData[]> => {
+  // Fetch the week events from Firestore that have a yearString within the provided array
+  const eventsCollection = collection(firestore, "fiscalWeeks");
+  
+  // Ensure the array of years is not larger than 10, as that's the maximum the 'in' operator supports
+  if (years.length > 10) {
+    throw new Error("The 'in' query operator supports up to 10 elements in the array.");
+  }
 
-  // Fetch the week events from Firestore that have an end date after or on the start of the month
-  const eventsCollection = collection(firestore, "fiscalWeekEvents");
-  const queryEvents = query(
-    eventsCollection,
-    where("end", ">=", startOfMonthStr),
-  );
-
+  const queryEvents = query(eventsCollection, where("yearString", "in", years));
   const querySnapshot = await getDocs(queryEvents);
-
-  const fetchedEvents: FiscalMonthEvent[] = [];
+  const fetchedEvents: WeekData[] = [];
   querySnapshot.forEach((doc) => {
-    const eventData = doc.data() as any; // Adjusted the type here
-
-    // Ensure the event's start date is on or before the end of the month
-    // and the event's end date is on or after the start of the month
-    if (eventData.start <= endOfMonthStr && eventData.end >= startOfMonthStr) {
-      fetchedEvents.push(eventData);
-    } else {
-      console.error(
-        "Invalid or out-of-range date for eventData.start or eventData.end:",
-        eventData.start,
-        eventData.end,
-      );
-    }
+    const eventData = doc.data() as WeekData;
+    fetchedEvents.push(eventData);
   });
-
-  console.log(fetchedEvents);
   return fetchedEvents;
 };
 
@@ -213,7 +122,7 @@ export const updateRecurringEntry = async (
   oldName: string,
   oldValue: number,
   newName: string,
-  newValue: number,
+  newValue: number
 ) => {
   const budgetRef = doc(firestore, "familyBudget", "budget");
   const newEntry = { name: newName, value: newValue };
@@ -231,7 +140,7 @@ export const updateRecurringEntry = async (
             .data()
             .incomes.filter(
               (entry: RecurringEntry) =>
-                entry.name !== oldName && entry.value !== oldValue,
+                entry.name !== oldName && entry.value !== oldValue
             ),
           newEntry,
         ],
@@ -243,7 +152,7 @@ export const updateRecurringEntry = async (
             .data()
             .expenses.filter(
               (entry: RecurringEntry) =>
-                entry.name !== oldName && entry.value !== oldValue,
+                entry.name !== oldName && entry.value !== oldValue
             ),
           newEntry,
         ],
@@ -255,7 +164,7 @@ export const updateRecurringEntry = async (
 export const deleteRecurringEntry = async (
   type: "income" | "expense",
   name: string,
-  value: number,
+  value: number
 ) => {
   const budgetRef = doc(firestore, "familyBudget", "budget");
 
@@ -295,7 +204,7 @@ export const fetchNonRecurringExpenses = async (): Promise<
   const nonRecurringSnap = await getDocs(query(nonRecurringCollection));
 
   return nonRecurringSnap.docs.map(
-    (doc) => ({ docId: doc.id, ...doc.data() }) as NonRecurringEntry,
+    (doc) => ({ docId: doc.id, ...doc.data() }) as NonRecurringEntry
   );
 };
 
@@ -306,7 +215,7 @@ export const deleteNonRecurringExpense = async (docId: string) => {
 
 export const updateNonRecurringExpense = async (
   docId: string,
-  entry: NonRecurringEntry,
+  entry: NonRecurringEntry
 ) => {
   const nonRecurringRef = doc(firestore, "nonRecurringExpenses", docId);
 
@@ -353,14 +262,14 @@ export const fetchTotalIncomeAndExpenses = async (): Promise<{
   if (data?.incomes) {
     totalIncome = data.incomes.reduce(
       (acc: number, entry: RecurringEntry) => acc + entry.value,
-      0,
+      0
     );
   }
 
   if (data?.expenses) {
     totalExpenses = data.expenses.reduce(
       (acc: number, entry: RecurringEntry) => acc + entry.value,
-      0,
+      0
     );
   }
 
@@ -387,7 +296,7 @@ export const updateTotalIncome = async (newIncome: number): Promise<void> => {
 };
 
 export const updateTotalExpenses = async (
-  newExpense: number,
+  newExpense: number
 ): Promise<void> => {
   const budgetRef = doc(firestore, "familyBudget", "budget");
   const currentData = await getDoc(budgetRef);
@@ -447,7 +356,7 @@ export const addCategory = async (category: string): Promise<void> => {
   }
 };
 
-// Update the generateFiscalData function inside your FiscalCalendar component
+// temp script
 export async function generateFiscalYearsData(
   startYear: number,
   numberOfYears: number
@@ -468,7 +377,6 @@ export async function generateFiscalYearsData(
       monthStrings: [],
       weeks: [],
       weekStrings: [],
-      weekEvents: [],
       docId: "",
     };
 
@@ -516,7 +424,6 @@ export async function generateFiscalYearsData(
         };
         fiscalWeeks.push(week);
         month.weekStrings?.push(weekDocId);
-        year.weekEvents?.push(week);
         year.weekStrings.push(weekDocId);
       }
 
@@ -596,24 +503,6 @@ export async function generateFiscalYearsData(
       }
     );
 
-    const fiscalWeeks: WeekData[] = [];
-
-    year.weekEvents?.forEach((week, j) => {
-      let monthRef: DocumentReference | undefined;
-      if (week.monthString) {
-        monthRef = doc(firestore, "fiscalMonths", week.monthString);
-      }
-      const weekData: WeekData = {
-        weekNumber: week.weekNumber,
-        start: week.start,
-        end: week.end,
-        title: week.title,
-        allDay: true,
-        month: monthRef,
-      };
-      fiscalWeeks.push(weekData);
-    });
-
     // Add the set operation to the batch
     docRef &&
       batch2.update(docRef, {
@@ -623,7 +512,6 @@ export async function generateFiscalYearsData(
         weekStrings: deleteField(),
         monthStrings: deleteField(),
         docId: deleteField(),
-        weekEvents: fiscalWeeks,
       });
     console.log(
       `Prepared year ${year.docId} with index: ${index} for batch2 update`
@@ -631,15 +519,17 @@ export async function generateFiscalYearsData(
   });
 
   const fiscalMonthsPromises = fiscalMonths.map(async (month, index) => {
-    const docRef = month.docId ? doc(firestore, "fiscalMonths", month.docId) : undefined;
-  
+    const docRef = month.docId
+      ? doc(firestore, "fiscalMonths", month.docId)
+      : undefined;
+
     // We assume that the month.yearString always has a corresponding document.
     const yearReference = await findYearDocRef(month.yearString);
-  
+
     let weekReferences: DocumentReference[] = month.weekStrings.map(
       (weekString) => doc(firestore, "fiscalWeeks", weekString)
     );
-  
+
     // Check if we found the yearReference
     if (yearReference && docRef) {
       batch2.update(docRef, {
@@ -648,9 +538,13 @@ export async function generateFiscalYearsData(
         weekStrings: deleteField(),
         docId: deleteField(),
       });
-      console.log(`Prepared month ${month.docId} with index: ${index} for batch2 update`);
+      console.log(
+        `Prepared month ${month.docId} with index: ${index} for batch2 update`
+      );
     } else {
-      console.error(`Could not find year document for yearString: ${month.yearString}`);
+      console.error(
+        `Could not find year document for yearString: ${month.yearString}`
+      );
     }
   });
 

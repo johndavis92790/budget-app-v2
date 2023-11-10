@@ -2,64 +2,45 @@ import React, { useEffect, useState } from "react";
 import { Calendar as BigCalendar, momentLocalizer } from "react-big-calendar";
 import moment from "moment";
 import "react-big-calendar/lib/css/react-big-calendar.css";
-import { ordinal } from "../utils/Helpers";
-import { YearData, fetchFiscalYearData } from "../utils/FirebaseHelpers";
-
-export type FiscalMonthEvent = {
-  title: string;
-  start: Date;
-  end: Date;
-  allDay: boolean;
-  weekNumber: number;
-};
+import { WeekData, fetchFiscalWeekEvents } from "../utils/FirebaseHelpers";
 
 const localizer = momentLocalizer(moment);
 
 export const FiscalCalendar: React.FC = () => {
   const [date, setDate] = useState(new Date());
-  const [events, setEvents] = useState<FiscalMonthEvent[]>([]);
+  const [events, setEvents] = useState<WeekData[]>([]);
 
   useEffect(() => {
     const fetchData = async () => {
-      const createEventsFromYear = (yearData: YearData): FiscalMonthEvent[] => {
-        const newEvents: FiscalMonthEvent[] = [];
-        yearData.weekEvents?.forEach((week) => {
+      const createWeeklyEvents = (weekEvents: WeekData[]): WeekData[] => {
+        const newEvents: WeekData[] = [];
+        weekEvents.forEach((week) => {
           newEvents.push({
-            title: week.title || `${ordinal(week.weekNumber)} Week`,
-            start: new Date(
+            ...week,
+            startDate: new Date(
               new Date(week.start).setDate(new Date(week.start).getDate() + 1)
             ),
-            end: new Date(
+            endDate: new Date(
               new Date(week.end).setDate(new Date(week.end).getDate() + 1)
             ),
-            allDay: week.allDay,
-            weekNumber: week.weekNumber,
           });
         });
         return newEvents;
       };
 
       const yearsToFetch = [
-        date.getFullYear(),
-        date.getFullYear() + 1,
-        date.getFullYear() - 1,
+        `${date.getFullYear()}`,
+        `${date.getFullYear() + 1}`,
+        `${date.getFullYear() - 1}`,
       ];
 
-      let allEvents: FiscalMonthEvent[] = [];
+      const fetchedYearWeeks: WeekData[] | null =
+        await fetchFiscalWeekEvents(yearsToFetch);
+      if (!fetchedYearWeeks) return;
+      const newEvents = createWeeklyEvents(fetchedYearWeeks);
 
-      for (const year of yearsToFetch) {
-        const fetchedYear: YearData | null = await fetchFiscalYearData(
-          `${year}`
-        );
-        if (!fetchedYear) continue;
-        console.log(fetchedYear);
-        const newEvents = createEventsFromYear(fetchedYear);
-        allEvents = [...allEvents, ...newEvents];
-        console.log(newEvents);
-      }
-
-      setEvents(allEvents);
-      console.log(allEvents);
+      setEvents(newEvents);
+      console.log(newEvents);
     };
 
     fetchData();
@@ -69,22 +50,16 @@ export const FiscalCalendar: React.FC = () => {
     <div style={{ height: 600 }}>
       <BigCalendar
         localizer={localizer}
-        startAccessor="start"
-        endAccessor="end"
+        startAccessor="startDate"
+        endAccessor="endDate"
         views={["month"]}
         defaultView="month"
         defaultDate={new Date()}
         selectable={true}
         eventPropGetter={eventStyleGetter}
         components={{
-          event: ({
-            event,
-            title,
-          }: {
-            event: FiscalMonthEvent;
-            title: string;
-          }) => {
-            if (event.start.getDay() === 0) {
+          event: ({ event, title }: { event: WeekData; title: string }) => {
+            if (event.startDate?.getDay() === 0) {
               return (
                 <div
                   style={{
@@ -114,7 +89,7 @@ export const FiscalCalendar: React.FC = () => {
   );
 };
 
-const eventStyleGetter = (event: FiscalMonthEvent) => {
+const eventStyleGetter = (event: WeekData) => {
   let backgroundColor = "#f0f0f0";
   if (event.weekNumber === 1) {
     backgroundColor = "#d9ead3";
