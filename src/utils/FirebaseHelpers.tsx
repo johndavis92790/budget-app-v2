@@ -11,9 +11,161 @@ import {
   getDocs,
   query,
   deleteDoc,
+  where,
+  DocumentReference,
+  deleteField,
+  writeBatch,
 } from "firebase/firestore";
 import { firestore } from "./firebase";
-import { RecurringEntry, NonRecurringEntry } from "./Helpers";
+import { RecurringEntry, NonRecurringEntry, ordinal } from "./Helpers";
+import { FiscalMonthEvent } from "../components/FiscalCalendar";
+
+export interface WeekData {
+  weekNumber: number;
+  start: string;
+  end: string;
+  title: string;
+  allDay: boolean;
+  docId?: string;
+  year?: DocumentReference;
+  yearString?: string;
+  month?: DocumentReference;
+  monthString?: string;
+}
+
+export interface MonthData {
+  startDate: string;
+  endDate: string;
+  weeks?: DocumentReference[];
+  weekStrings: string[];
+  year?: DocumentReference;
+  yearString: string;
+  docId?: string;
+}
+
+export interface YearData {
+  year: string;
+  startDate: string;
+  endDate?: string;
+  months?: DocumentReference[];
+  monthStrings: string[];
+  weeks?: DocumentReference[];
+  weekStrings: string[];
+  weekEvents?: WeekData[];
+  docId?: string;
+}
+
+export const addFiscalMonthToFirestore = async (monthData: MonthData) => {
+  try {
+    // Generate the document ID
+    const docId = `${monthData.startDate}_${monthData.endDate}`;
+
+    // Set the document with the specified ID
+    const docRef = doc(firestore, "fiscalMonths", docId);
+    await setDoc(docRef, monthData);
+
+    console.log("Document written with ID: ", docRef.id);
+  } catch (e) {
+    console.error("Error adding document: ", e);
+  }
+};
+
+export const addFiscalYearToFirestore = async (yearData: YearData) => {
+  try {
+    // Generate the document ID
+    const docId = `${yearData.year}`;
+
+    // Set the document with the specified ID
+    const docRef = doc(firestore, "fiscalYears", docId);
+    await setDoc(docRef, yearData);
+
+    console.log("Document written with ID: ", docRef.id);
+  } catch (e) {
+    console.error("Error adding document: ", e);
+  }
+};
+
+export const fetchFiscalYearData = async (
+  date: string,
+): Promise<YearData | null> => {
+  const fiscalYearsCollection = collection(firestore, "fiscalYears");
+  const queryYear = query(
+    fiscalYearsCollection,
+    where("year", "==", date),
+  );
+  const querySnapshot = await getDocs(queryYear);
+  const fetchedYear: YearData[] = [];
+  querySnapshot.forEach((doc) => {
+    const eventData = doc.data() as any;
+    fetchedYear.push(eventData);
+  });
+  if (fetchedYear.length === 1){
+    return fetchedYear[0];
+  } else {
+    return null
+  }
+};
+
+export const fetchFiscalMonthData = async (date: Date) => {
+  const fiscalMonthsCollection = "fiscalMonths"; // Collection name
+  const docID = `${date.toISOString().split("T")[0]}_${
+    new Date(date.getFullYear(), date.getMonth() + 1, 0)
+      .toISOString()
+      .split("T")[0]
+  }`;
+  console.log(docID);
+  const docRef = doc(firestore, fiscalMonthsCollection, docID);
+  const docData = await getDoc(docRef);
+
+  if (docData.exists()) {
+    console.log("Fetched data: ", docData.data());
+    return docData.data();
+  } else {
+    return null;
+  }
+};
+
+export const fetchFiscalWeekEvents = async (
+  date: Date,
+): Promise<FiscalMonthEvent[]> => {
+  // Define the range for the visible month
+  const startOfMonthStr = `${date.getFullYear()}-${String(
+    date.getMonth() + 1,
+  ).padStart(2, "0")}-01`;
+  const endOfMonth = new Date(date.getFullYear(), date.getMonth() + 1, 0);
+  const endOfMonthStr = `${date.getFullYear()}-${String(
+    date.getMonth() + 1,
+  ).padStart(2, "0")}-${endOfMonth.getDate()}`;
+
+  // Fetch the week events from Firestore that have an end date after or on the start of the month
+  const eventsCollection = collection(firestore, "fiscalWeekEvents");
+  const queryEvents = query(
+    eventsCollection,
+    where("end", ">=", startOfMonthStr),
+  );
+
+  const querySnapshot = await getDocs(queryEvents);
+
+  const fetchedEvents: FiscalMonthEvent[] = [];
+  querySnapshot.forEach((doc) => {
+    const eventData = doc.data() as any; // Adjusted the type here
+
+    // Ensure the event's start date is on or before the end of the month
+    // and the event's end date is on or after the start of the month
+    if (eventData.start <= endOfMonthStr && eventData.end >= startOfMonthStr) {
+      fetchedEvents.push(eventData);
+    } else {
+      console.error(
+        "Invalid or out-of-range date for eventData.start or eventData.end:",
+        eventData.start,
+        eventData.end,
+      );
+    }
+  });
+
+  console.log(fetchedEvents);
+  return fetchedEvents;
+};
 
 export const addRecurringEntry = async (entry: {
   type: "income" | "expense";
@@ -294,3 +446,262 @@ export const addCategory = async (category: string): Promise<void> => {
     });
   }
 };
+
+// Update the generateFiscalData function inside your FiscalCalendar component
+export async function generateFiscalYearsData(
+  startYear: number,
+  numberOfYears: number
+) {
+  const fiscalYears: YearData[] = [];
+  const fiscalMonths: MonthData[] = [];
+  const fiscalWeeks: WeekData[] = [];
+  let fiscalYearStartDate = new Date(Date.UTC(startYear, 0, 10)); // Starting from January 10th of the start year
+
+  for (let i = 0; i < numberOfYears; i++) {
+    const yearStartDateString = fiscalYearStartDate.toISOString().split("T")[0];
+    const currentYear = (startYear + i).toString();
+    const year: YearData = {
+      year: currentYear,
+      startDate: yearStartDateString,
+      endDate: "", // Will be set after calculating the end date
+      months: [],
+      monthStrings: [],
+      weeks: [],
+      weekStrings: [],
+      weekEvents: [],
+      docId: "",
+    };
+
+    let tempMonthEndStrings: string[] = [];
+    for (let j = 0; j < 13; j++) {
+      // 13 months in a fiscal year
+      const monthStartDate = new Date(
+        fiscalYearStartDate.getTime() + j * 28 * 24 * 60 * 60 * 1000
+      );
+      const monthEndDate = new Date(
+        monthStartDate.getTime() + 27 * 24 * 60 * 60 * 1000
+      )
+        .toISOString()
+        .split("T")[0];
+      const month: MonthData = {
+        startDate: monthStartDate.toISOString().split("T")[0],
+        weeks: [],
+        weekStrings: [],
+        endDate: monthEndDate,
+        yearString: currentYear,
+        docId: "",
+      };
+
+      month.docId = `${month.startDate}_${month.endDate}`;
+
+      for (let k = 0; k < 4; k++) {
+        // 4 weeks in a month
+        const weekStart = new Date(
+          monthStartDate.getTime() + k * 7 * 24 * 60 * 60 * 1000
+        );
+        const weekEnd = new Date(weekStart.getTime() + 6 * 24 * 60 * 60 * 1000);
+
+        const weekDocId = `${weekStart.toISOString().split("T")[0]}_${
+          weekEnd.toISOString().split("T")[0]
+        }`;
+        const week: WeekData = {
+          weekNumber: k + 1,
+          start: weekStart.toISOString().split("T")[0],
+          end: weekEnd.toISOString().split("T")[0],
+          title: `${ordinal(k + 1)} Week`,
+          allDay: true,
+          docId: weekDocId,
+          yearString: currentYear,
+          monthString: month.docId,
+        };
+        fiscalWeeks.push(week);
+        month.weekStrings?.push(weekDocId);
+        year.weekEvents?.push(week);
+        year.weekStrings.push(weekDocId);
+      }
+
+      if (month.endDate) tempMonthEndStrings.push(month.endDate);
+      year.monthStrings.push(month.docId);
+      fiscalMonths.push(month);
+    }
+
+    // Set the end date of the fiscal year to the end date of the last month
+    year.endDate = tempMonthEndStrings[tempMonthEndStrings.length - 1];
+    year.docId = `${yearStartDateString}_${year.endDate}`;
+
+    fiscalYears.push(year);
+    // Set the start date for the next fiscal year by adding 364 days to the current fiscal year's start date
+    fiscalYearStartDate = new Date(
+      fiscalYearStartDate.getTime() + 364 * 24 * 60 * 60 * 1000
+    );
+  }
+
+  console.log("fiscalYears: ", fiscalYears);
+  console.log("fiscalMonths: ", fiscalMonths);
+  console.log("fiscalWeeks: ", fiscalWeeks);
+
+  const batch1 = writeBatch(firestore); // Create a batch operation
+
+  fiscalYears.forEach((year, index) => {
+    // Reference the document to be written
+    const docRef = year.docId && doc(firestore, "fiscalYears", year.docId);
+    // Add the set operation to the batch
+    docRef && batch1.set(docRef, year);
+    console.log(
+      `Prepared year ${year.year} with index: ${index} for batch1 save`
+    );
+  });
+
+  fiscalMonths.forEach((month, index) => {
+    // Reference the document to be written
+    const docRef = month.docId && doc(firestore, "fiscalMonths", month.docId);
+    // Add the set operation to the batch
+    docRef && batch1.set(docRef, month);
+    console.log(
+      `Prepared month ${month.docId} with index: ${index} for batch1 save`
+    );
+  });
+
+  fiscalWeeks.forEach((week, index) => {
+    // Reference the document to be written
+    const docRef = week.docId && doc(firestore, "fiscalWeeks", week.docId);
+    // Add the set operation to the batch
+    docRef && batch1.set(docRef, week);
+    console.log(
+      `Prepared week ${week.docId} with index: ${index} for batch1 save`
+    );
+  });
+
+  // Commit the batch
+  try {
+    await batch1.commit();
+    console.log("All documents written to Firestore from batch1");
+  } catch (e) {
+    console.error("Error writing documents to Firestore on batch1: ", e);
+  }
+
+  const batch2 = writeBatch(firestore); // Create a batch operation
+
+  fiscalYears.forEach((year, index) => {
+    // Reference the document to be written
+    const docRef = year.docId && doc(firestore, "fiscalYears", year.docId);
+    let weekReferences: DocumentReference[] = year.weekStrings.map(
+      (weekString) => {
+        return doc(firestore, "fiscalWeeks", weekString);
+      }
+    );
+    let monthReferences: DocumentReference[] = year.monthStrings.map(
+      (monthString) => {
+        return doc(firestore, "fiscalMonths", monthString);
+      }
+    );
+
+    const fiscalWeeks: WeekData[] = [];
+
+    year.weekEvents?.forEach((week, j) => {
+      let monthRef: DocumentReference | undefined;
+      if (week.monthString) {
+        monthRef = doc(firestore, "fiscalMonths", week.monthString);
+      }
+      const weekData: WeekData = {
+        weekNumber: week.weekNumber,
+        start: week.start,
+        end: week.end,
+        title: week.title,
+        allDay: true,
+        month: monthRef,
+      };
+      fiscalWeeks.push(weekData);
+    });
+
+    // Add the set operation to the batch
+    docRef &&
+      batch2.update(docRef, {
+        weeks: weekReferences,
+        months: monthReferences,
+        yearString: deleteField(),
+        weekStrings: deleteField(),
+        monthStrings: deleteField(),
+        docId: deleteField(),
+        weekEvents: fiscalWeeks,
+      });
+    console.log(
+      `Prepared year ${year.docId} with index: ${index} for batch2 update`
+    );
+  });
+
+  const fiscalMonthsPromises = fiscalMonths.map(async (month, index) => {
+    const docRef = month.docId ? doc(firestore, "fiscalMonths", month.docId) : undefined;
+  
+    // We assume that the month.yearString always has a corresponding document.
+    const yearReference = await findYearDocRef(month.yearString);
+  
+    let weekReferences: DocumentReference[] = month.weekStrings.map(
+      (weekString) => doc(firestore, "fiscalWeeks", weekString)
+    );
+  
+    // Check if we found the yearReference
+    if (yearReference && docRef) {
+      batch2.update(docRef, {
+        year: yearReference,
+        weeks: weekReferences,
+        weekStrings: deleteField(),
+        docId: deleteField(),
+      });
+      console.log(`Prepared month ${month.docId} with index: ${index} for batch2 update`);
+    } else {
+      console.error(`Could not find year document for yearString: ${month.yearString}`);
+    }
+  });
+
+  const fiscalWeeksPromises = fiscalWeeks.map(async (week, index) => {
+    // Find the document references
+    const yearReference = week.yearString
+      ? await findYearDocRef(week.yearString)
+      : undefined;
+    const monthReference = week.monthString
+      ? doc(firestore, "fiscalMonths", week.monthString)
+      : undefined;
+
+    // Reference the document to be written
+    const docRef = week.docId
+      ? doc(firestore, "fiscalWeeks", week.docId)
+      : undefined;
+
+    // If we have a docRef, add the update operation to the batch
+    if (docRef) {
+      batch2.update(docRef, {
+        year: yearReference,
+        month: monthReference,
+        monthString: deleteField(),
+        docId: deleteField(),
+      });
+    }
+
+    console.log(
+      `Prepared week ${week.docId} with index: ${index} for batch2 update`
+    );
+  });
+
+  // Once all the updates are prepared, commit the batch
+  Promise.all(fiscalWeeksPromises)
+    .then(() => Promise.all(fiscalMonthsPromises))
+    .then(() => batch2.commit())
+    .then(() => console.log("All updates committed to Firestore."))
+    .catch((error) => console.error("Error during batch update:", error));
+}
+
+// Define an async function to find the DocumentReference based on yearString
+async function findYearDocRef(
+  yearString: string
+): Promise<DocumentReference | undefined> {
+  const q = query(
+    collection(firestore, "fiscalYears"),
+    where("year", "==", yearString)
+  );
+  const querySnapshot = await getDocs(q);
+  if (!querySnapshot.empty) {
+    return querySnapshot.docs[0].ref;
+  }
+  return undefined;
+}

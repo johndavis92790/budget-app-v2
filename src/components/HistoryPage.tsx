@@ -149,7 +149,7 @@ const HistoryPage: React.FC = () => {
   };
 
   return (
-    <div>
+    <>
       <ExpenseModal
         showModal={showModal}
         handleCloseModal={handleCloseModal}
@@ -197,7 +197,7 @@ const HistoryPage: React.FC = () => {
         totalPages={totalPages}
         setCurrentPage={setCurrentPage}
       />
-    </div>
+    </>
   );
 };
 

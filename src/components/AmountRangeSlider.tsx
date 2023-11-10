@@ -1,5 +1,6 @@
 import React from "react";
 import { Range, getTrackBackground } from "react-range";
+import Spinner from "./Spinner";
 
 interface AmountRangeSliderProps {
   minExpense: number;
@@ -14,6 +15,9 @@ const AmountRangeSlider: React.FC<AmountRangeSliderProps> = ({
   amountRange,
   onAmountRangeChange,
 }) => {
+  if (amountRange[0] < minExpense || amountRange[1] > maxExpense) {
+    return <Spinner />;
+  }
   return (
     <Range
       step={1}

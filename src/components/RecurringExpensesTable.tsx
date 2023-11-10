@@ -10,7 +10,7 @@ export const RecurringExpensesTable: React.FC<{
 }> = ({ title, entries, handleEdit, total, handleAddNew }) => (
   <>
     <h2>{title}</h2>
-    <Table striped bordered hover>
+    <Table striped bordered hover size="sm">
       <thead>
         <tr>
           <th>Name</th>

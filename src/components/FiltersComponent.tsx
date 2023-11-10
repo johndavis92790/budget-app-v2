@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useEffect } from "react";
 import Select from "react-select";
 import { Form } from "react-bootstrap";
 import DateRangeSlider from "./DateRangeSlider";
@@ -24,11 +24,20 @@ interface FiltersProps {
 }
 
 const FiltersComponent: React.FC<FiltersProps> = (props) => {
+  const { minExpense, maxExpense, amountRange, setAmountRange } = props;
+
   const options = props.tags.map((tag) => ({ value: tag, label: tag }));
   const categoryOptions = props.categories.map((category) => ({
     value: category,
     label: category,
   }));
+
+  useEffect(() => {
+    // Ensure amountRange is within the boundaries of minExpense and maxExpense
+    if (amountRange[0] < minExpense || amountRange[1] > maxExpense) {
+      setAmountRange([minExpense, maxExpense]);
+    }
+  }, [minExpense, maxExpense, amountRange, setAmountRange]);
 
   return (
     <Form className="mb-3 form-inline">
