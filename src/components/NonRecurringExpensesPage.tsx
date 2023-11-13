@@ -89,7 +89,7 @@ const NonRecurringExpensesPage: React.FC = () => {
   };
 
   return (
-    <div>
+    <div className="p-2">
       <h1>Non-Recurring Expenses</h1>
       <h2>Current Monthly Goal: {formatAsCurrency(monthlyGoal)}</h2>
       {/* <button onClick={() => generateFiscalYearsData(2021, 60)}>

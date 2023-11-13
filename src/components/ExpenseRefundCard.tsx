@@ -41,7 +41,7 @@ const ExpenseRefundCard: React.FC<ExpenseRefundCardProps> = (props) => {
   const tagOptions = props.tags.map((tag) => ({ label: tag, value: tag }));
 
   return (
-    <Card className="mb-4">
+    <Card className="mb-3 mt-3">
       <Card.Body>
         <CreatableSelect
           onChange={props.handleOptionChange(props.setCurrentCategory)}

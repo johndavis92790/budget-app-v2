@@ -11,6 +11,8 @@ import FiltersComponent from "./FiltersComponent";
 import ExpenseModal from "./ExpenseModal";
 import { useExpensesData } from "../utils/hooks/useExpensesData";
 import { useCategoriesAndTags } from "../utils/hooks/useCategoriesAndTags";
+import { CategoryBarChart } from "./CategoryBarChart";
+import CategoryPieChart from "./CategoryPieChart";
 
 const HistoryPage: React.FC = () => {
   const { nonRecurringExpenses, minExpense, maxExpense } = useExpensesData();
@@ -21,18 +23,18 @@ const HistoryPage: React.FC = () => {
   const lastYearDate = new Date(
     currentDate.getFullYear() - 1,
     currentDate.getMonth(),
-    currentDate.getDate(),
+    currentDate.getDate()
   );
   const [dateStart, setDateStart] = useState<string>(
-    lastYearDate.toISOString().split("T")[0],
+    lastYearDate.toISOString().split("T")[0]
   );
   const [dateEnd, setDateEnd] = useState<string>(
-    currentDate.toISOString().split("T")[0],
+    currentDate.toISOString().split("T")[0]
   );
 
   // Filter-related states
   const [filteredExpenses, setFilteredExpenses] = useState<NonRecurringEntry[]>(
-    [],
+    []
   );
   const [currentCategories, setCurrentCategories] = useState<string[]>([]);
   const [currentTags, setCurrentTags] = useState<string[]>([]);
@@ -46,7 +48,7 @@ const HistoryPage: React.FC = () => {
   const [selectedExpense, setSelectedExpense] =
     useState<NonRecurringEntry | null>(null);
   const [editExpense, setEditExpense] = useState<NonRecurringEntry | null>(
-    null,
+    null
   );
 
   // Pagination states
@@ -54,7 +56,7 @@ const HistoryPage: React.FC = () => {
   const rowsPerPage = 100;
   const displayedExpenses = filteredExpenses.slice(
     (currentPage - 1) * rowsPerPage,
-    currentPage * rowsPerPage,
+    currentPage * rowsPerPage
   );
   const totalPages = Math.ceil(filteredExpenses.length / rowsPerPage);
 
@@ -62,7 +64,7 @@ const HistoryPage: React.FC = () => {
   const totalExpenses = filteredExpenses.reduce(
     (acc, expense) =>
       expense.type === "expense" ? acc + expense.value : acc - expense.value,
-    0,
+    0
   );
   const options = tags.map((tag: string) => ({ value: tag, label: tag }));
   const categoryOptions = categories.map((category: string) => ({
@@ -149,7 +151,7 @@ const HistoryPage: React.FC = () => {
   };
 
   return (
-    <>
+    <div className="p-2">
       <ExpenseModal
         showModal={showModal}
         handleCloseModal={handleCloseModal}
@@ -184,6 +186,8 @@ const HistoryPage: React.FC = () => {
       />
 
       <TimeChart filteredExpenses={filteredExpenses}></TimeChart>
+      <CategoryBarChart filteredExpenses={filteredExpenses}></CategoryBarChart>
+      <CategoryPieChart filteredExpenses={filteredExpenses}></CategoryPieChart>
 
       <div className="total-expenses">Total: ${totalExpenses.toFixed(2)}</div>
 
@@ -192,12 +196,14 @@ const HistoryPage: React.FC = () => {
         handleShowModal={handleShowModal}
       />
 
-      <TablePagination
-        currentPage={currentPage}
-        totalPages={totalPages}
-        setCurrentPage={setCurrentPage}
-      />
-    </>
+      <div className="pagination-container">
+        <TablePagination
+          currentPage={currentPage}
+          totalPages={totalPages}
+          setCurrentPage={setCurrentPage}
+        />
+      </div>
+    </div>
   );
 };
 

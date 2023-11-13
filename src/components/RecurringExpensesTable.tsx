@@ -15,25 +15,19 @@ export const RecurringExpensesTable: React.FC<{
         <tr>
           <th>Name</th>
           <th>Amount</th>
-          <th>Edit</th>
         </tr>
       </thead>
       <tbody>
         {entries.map((entry, index) => (
-          <tr key={index}>
+          <tr
+            key={index}
+            onClick={() =>
+              handleEdit(title.toLowerCase() as "income" | "expense", entry)
+            }
+          >
             <td>{entry.name}</td>
             <td className="money-column-right-align">
               {formatAsCurrency(entry.value)}
-            </td>
-            <td>
-              <Button
-                size="sm"
-                onClick={() =>
-                  handleEdit(title.toLowerCase() as "income" | "expense", entry)
-                }
-              >
-                Edit
-              </Button>
             </td>
           </tr>
         ))}
@@ -44,7 +38,6 @@ export const RecurringExpensesTable: React.FC<{
           <td className="money-column-right-align">
             {formatAsCurrency(total)}
           </td>
-          <td></td>
         </tr>
       </tfoot>
     </Table>

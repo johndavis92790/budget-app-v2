@@ -93,8 +93,8 @@ const RecurringExpensesPage: React.FC = () => {
   } = calculateTotals(incomes, sortedExpenses);
 
   return (
-    <div>
-      <h1>Recurring Expenses and Incomes</h1>
+    <div className="p-2">
+      <h1 className="mb-3">Budget</h1>
 
       <RecurringExpensesTable
         title="Incomes"

@@ -15,41 +15,75 @@ const ExpensesTable: React.FC<Props> = ({
   displayedExpenses,
   handleShowModal,
 }) => {
+  // Sort expenses by date in descending order
+  const sortedExpenses = displayedExpenses.sort((a, b) => {
+    const dateA = new Date(a.date);
+    const dateB = new Date(b.date);
+    return dateB.getTime() - dateA.getTime();
+  });
+
   return (
-    <Table striped bordered hover size="sm" className="small-font-table">
+    <Table striped hover size="sm" className="table-history">
       <thead>
         <tr>
-          <th>Type</th>
-          <th>Category</th>
-          <th>Tags</th>
-          <th>Date</th>
-          <th className="money-column-right-align">Amount</th>
+          <th className="text-left">History</th>
+          <th className="text-left"></th>
         </tr>
       </thead>
       <tbody>
-        {displayedExpenses.map((expense, idx) => (
+        {sortedExpenses.map((expense, idx) => (
           <tr key={idx} onClick={() => handleShowModal(expense)}>
-            <td>{expense.type === "expense" ? "Expense" : "Refund"}</td>
-            <td>{expense.category}</td>
-            <td>
-              {expense.tags.length > 0
-                ? expense.tags.map((tag, idx) => (
-                    <span key={idx} className="tag">
-                      {tag}
-                    </span>
-                  ))
-                : "N/A"}
+            <td className="first-column">
+              <div>
+                <span className="large-font">{expense.category}</span>
+                <br />
+
+                <div className="small-font">
+                  <span>
+                    {expense.type === "expense" ? "Expense" : "Refund"}
+                  </span>
+                </div>
+                <div className="small-font">
+                  {expense.tags.length > 0 ? (
+                    expense.tags.map((tag, idx) => (
+                      <span
+                        key={idx}
+                        className="tag"
+                        style={{ marginRight: "5px" }}
+                      >
+                        {tag}
+                      </span>
+                    ))
+                  ) : (
+                    <span></span>
+                  )}
+                </div>
+              </div>
             </td>
-            <td className="date-column">
-              {expense.date ? formatDate(expense.date) : "N/A"}
-            </td>
-            <td
-              className="money-column-right-align"
-              style={{ color: expense.type === "expense" ? "red" : "green" }}
-            >
-              {expense.type === "expense"
-                ? "-" + formatAsCurrency(expense.value)
-                : "+" + formatAsCurrency(expense.value)}
+            <td className="second-column">
+              <div>
+                <div>
+                  <span
+                    className="large-font"
+                    style={{
+                      color: expense.type === "expense" ? "red" : "green",
+                    }}
+                  >
+                    {expense.type === "expense"
+                      ? "-" + formatAsCurrency(expense.value)
+                      : "+" + formatAsCurrency(expense.value)}
+                  </span>
+                </div>
+                <div>
+                  <span className="small-font">
+                    {/* {formatAsCurrency(expense.balance)} */}
+                    $1,000.00
+                  </span>
+                </div>
+                <div className="small-font">
+                  <span>{expense.date ? formatDate(expense.date) : "N/A"}</span>
+                </div>
+              </div>
             </td>
           </tr>
         ))}
