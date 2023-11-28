@@ -17,8 +17,6 @@ import {
   writeBatch,
   orderBy,
   limit,
-  DocumentSnapshot,
-  DocumentData,
 } from "firebase/firestore";
 import { firestore } from "./firebase";
 import { RecurringEntry, NonRecurringEntry, ordinal } from "./Helpers";
