@@ -40,6 +40,19 @@ const ExpenseRefundCard: React.FC<ExpenseRefundCardProps> = (props) => {
   }));
   const tagOptions = props.tags.map((tag) => ({ label: tag, value: tag }));
 
+  const handleCreateAndSelectTag = async (newTag: string) => {
+    // Create the new tag
+    await props.handleCreateItem(
+      newTag,
+      props.tags,
+      props.addTag,
+      props.setTags,
+    );
+
+    // Update the current tags to include the new tag
+    props.setCurrentTags((prevTags) => [...prevTags, newTag]);
+  };
+
   return (
     <Card className="mb-3 mt-3">
       <Card.Body>
@@ -58,14 +71,7 @@ const ExpenseRefundCard: React.FC<ExpenseRefundCardProps> = (props) => {
           isMulti
           isClearable
           onChange={props.handleMultiOptionChange(props.setCurrentTags)}
-          onCreateOption={(value) =>
-            props.handleCreateItem(
-              value,
-              props.tags,
-              props.addTag,
-              props.setTags,
-            )
-          }
+          onCreateOption={handleCreateAndSelectTag}
           options={tagOptions}
           value={props.currentTags.map((tag) => ({ label: tag, value: tag }))}
           placeholder="Select or create tags..."

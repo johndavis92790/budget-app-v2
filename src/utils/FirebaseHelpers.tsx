@@ -15,6 +15,8 @@ import {
   DocumentReference,
   deleteField,
   writeBatch,
+  orderBy,
+  limit,
 } from "firebase/firestore";
 import { firestore } from "./firebase";
 import { RecurringEntry, NonRecurringEntry, ordinal } from "./Helpers";
@@ -60,10 +62,12 @@ export const fetchFiscalWeekEvents = async (
 ): Promise<WeekData[]> => {
   // Fetch the week events from Firestore that have a yearString within the provided array
   const eventsCollection = collection(firestore, "fiscalWeeks");
-  
+
   // Ensure the array of years is not larger than 10, as that's the maximum the 'in' operator supports
   if (years.length > 10) {
-    throw new Error("The 'in' query operator supports up to 10 elements in the array.");
+    throw new Error(
+      "The 'in' query operator supports up to 10 elements in the array."
+    );
   }
 
   const queryEvents = query(eventsCollection, where("yearString", "in", years));
@@ -181,17 +185,21 @@ export const deleteRecurringEntry = async (
   }
 };
 
-export const addNonRecurringExpense = async (entry: NonRecurringEntry) => {
+export const addNonRecurringExpense = async (
+  entry: NonRecurringEntry
+): Promise<DocumentReference> => {
   const nonRecurringCollection = collection(firestore, "nonRecurringExpenses");
-  await addDoc(nonRecurringCollection, {
+  return await addDoc(nonRecurringCollection, {
     ...entry,
     type: "expense",
   });
 };
 
-export const addNonRecurringRefund = async (entry: NonRecurringEntry) => {
+export const addNonRecurringRefund = async (
+  entry: NonRecurringEntry
+): Promise<DocumentReference> => {
   const nonRecurringCollection = collection(firestore, "nonRecurringExpenses");
-  await addDoc(nonRecurringCollection, {
+  return await addDoc(nonRecurringCollection, {
     ...entry,
     type: "refund",
   });
@@ -599,3 +607,61 @@ async function findYearDocRef(
   }
   return undefined;
 }
+
+export const fetchEntriesAfterDate = async (
+  date: string
+): Promise<NonRecurringEntry[]> => {
+  try {
+    const entriesRef = collection(firestore, "nonRecurringExpenses"); // Ensure this matches your collection name
+    const q = query(entriesRef, where("date", ">", date));
+    const querySnapshot = await getDocs(q);
+    console.log(
+      "querySnapshot",
+      querySnapshot.docs.map(
+        (doc) => ({ docId: doc.id, ...doc.data() }) as NonRecurringEntry
+      )
+    );
+    return querySnapshot.docs.map(
+      (doc) => ({ docId: doc.id, ...doc.data() }) as NonRecurringEntry
+    );
+  } catch (error) {
+    console.error("Error fetching entries after date:", error);
+    throw error; // Or handle it as needed
+  }
+};
+
+export async function fetchMostRecentEntryBeforeDate(
+  date: string
+): Promise<NonRecurringEntry | null> {
+  const entriesRef = collection(firestore, "nonRecurringExpenses");
+  const q = query(
+    entriesRef,
+    where("date", "<", date),
+    orderBy("date", "desc"),
+    limit(1)
+  );
+  const querySnapshot = await getDocs(q);
+
+  if (!querySnapshot.empty) {
+    const doc = querySnapshot.docs[0];
+    return { docId: doc.id, ...doc.data() } as NonRecurringEntry;
+  } else {
+    return null;
+  }
+}
+
+export const updateEntries = async (
+  entries: NonRecurringEntry[]
+): Promise<void> => {
+  await runTransaction(firestore, async (transaction) => {
+    entries.forEach((entry) => {
+      if (entry.docId) {
+        const entryRef = doc(firestore, "nonRecurringExpenses", entry.docId);
+        transaction.update(entryRef, entry);
+      } else {
+        // Throw an error if docId is undefined
+        throw new Error("Entry missing docId cannot be updated.");
+      }
+    });
+  });
+};

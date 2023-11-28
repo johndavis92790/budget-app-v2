@@ -26,10 +26,7 @@ export function CategoryPieChart(props: CategoryPieChartProps) {
 
     // Convert to array, sort, and then map to chart data format
     const sortedData = Object.entries(categorySums).sort((a, b) => b[1] - a[1]);
-    return [
-      ["Category", "Money Spent"],
-      ...sortedData,
-    ];
+    return [["Category", "Money Spent"], ...sortedData];
   };
 
   const chartOptions = {

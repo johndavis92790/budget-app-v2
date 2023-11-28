@@ -1,8 +1,12 @@
+import { Timestamp } from "firebase/firestore";
 import {
   addCategory,
   addNonRecurringExpense,
   addNonRecurringRefund,
   addTag,
+  fetchEntriesAfterDate,
+  fetchMostRecentEntryBeforeDate,
+  updateEntries,
   updateMonthlyGoal,
 } from "./FirebaseHelpers";
 
@@ -40,9 +44,12 @@ export type NonRecurringEntry = {
   category: string;
   tags: string[];
   date: string;
+  dateTime: Timestamp;
   value: number;
   type: string;
   notes: string;
+  goalFrom?: number;
+  goalTo?: number;
 };
 
 export type RecurringEntry = {
@@ -60,7 +67,7 @@ export function formatDate(dateString: string): string {
 }
 
 export const handleCurrencyChange = (
-  e: React.ChangeEvent<HTMLInputElement>,
+  e: React.ChangeEvent<HTMLInputElement>
 ) => {
   // Strip out all non-numeric characters except for the decimal point
   const value = e.target.value.replace(/[^\d.]/g, "");
@@ -71,36 +78,34 @@ export const handleNewEntry = async (
   type: "expense" | "refund",
   currentTags: string[],
   tags: string[],
-  setTags: (value: string[] | ((prev: string[]) => string[])) => void,
+  setTags: React.Dispatch<React.SetStateAction<string[]>>,
   currentCategory: string,
   categories: string[],
-  setCategories: (value: string[] | ((prev: string[]) => string[])) => void,
+  setCategories: React.Dispatch<React.SetStateAction<string[]>>,
   currentDate: string,
   currentAmount: number | null,
   currentNotes: string,
-  setMonthlyGoal: (value: number) => void,
-  setNonRecurringExpenses: (
-    value:
-      | NonRecurringEntry[]
-      | ((prev: NonRecurringEntry[]) => NonRecurringEntry[]),
-  ) => void,
+  setMonthlyGoal: React.Dispatch<React.SetStateAction<number>>,
+  setNonRecurringExpenses: React.Dispatch<React.SetStateAction<NonRecurringEntry[]>>,
   monthlyGoal: number,
-  setCurrentCategory: (value: React.SetStateAction<string>) => void,
-  setCurrentTags: (value: React.SetStateAction<string[]>) => void,
-  setCurrentDate: (value: React.SetStateAction<string>) => void,
-  setCurrentAmount: (value: React.SetStateAction<number | null>) => void,
-  setCurrentNotes: (value: React.SetStateAction<string>) => void,
-) => {
+  setCurrentCategory: React.Dispatch<React.SetStateAction<string>>,
+  setCurrentTags: React.Dispatch<React.SetStateAction<string[]>>,
+  setCurrentDate: React.Dispatch<React.SetStateAction<string>>,
+  setCurrentAmount: React.Dispatch<React.SetStateAction<number | null>>,
+  setCurrentNotes: React.Dispatch<React.SetStateAction<string>>
+): Promise<void> => {
   if (currentTags.length === 0) {
     alert("Please choose or enter a tag.");
     return;
   }
 
   const newTags = currentTags.filter((tag) => !tags.includes(tag));
-  for (const tag of newTags) {
-    await addTag(tag);
-    setTags((prev) => [...prev, tag]);
-  }
+  await Promise.all(
+    newTags.map(async (tag) => {
+      await addTag(tag);
+      setTags((prev) => [...prev, tag]);
+    })
+  );
 
   if (!categories.includes(currentCategory)) {
     await addCategory(currentCategory);
@@ -113,47 +118,160 @@ export const handleNewEntry = async (
     currentDate &&
     currentAmount !== null
   ) {
-    const newEntry = {
-      category: currentCategory,
-      tags: currentTags,
-      date: currentDate,
-      value: currentAmount,
-      type,
-      notes: currentNotes,
-    };
+    const selectedDateTimestamp = Timestamp.fromDate(
+      new Date(currentDate + "T00:00:00")
+    );
+    const entryDate = new Date(currentDate);
+    const today = new Date(todaysDate);
 
-    if (type === "expense") {
-      await addNonRecurringExpense(newEntry);
-      const updatedGoal = monthlyGoal - currentAmount;
-      setMonthlyGoal(updatedGoal);
-      updateMonthlyGoal(updatedGoal);
+    const mostRecentEntryBefore =
+      await fetchMostRecentEntryBeforeDate(currentDate);
+      const goalFrom = mostRecentEntryBefore
+      ? mostRecentEntryBefore.goalTo!
+      : monthlyGoal;
+    
+    let newEntry = createNewEntry(
+      currentCategory,
+      currentTags,
+      currentDate,
+      selectedDateTimestamp,
+      currentAmount,
+      type,
+      currentNotes,
+      goalFrom
+    );
+
+    if (entryDate < today) {
+      const newEntryDocRef = await (type === "expense"
+        ? addNonRecurringExpense(newEntry)
+        : addNonRecurringRefund(newEntry));
+      newEntry.docId = newEntryDocRef.id;
+
+      const subsequentEntries = await fetchEntriesAfterDate(currentDate);
+      const allEntries = sortEntries([newEntry, ...subsequentEntries]);
+      recalculateAndUpdateEntries(
+        allEntries,
+        setNonRecurringExpenses,
+        setMonthlyGoal,
+        updateMonthlyGoal
+      );
     } else {
-      await addNonRecurringRefund(newEntry);
-      const updatedGoal = monthlyGoal + currentAmount;
-      setMonthlyGoal(updatedGoal);
-      updateMonthlyGoal(updatedGoal);
+      addLatestEntry(
+        newEntry,
+        type,
+        setMonthlyGoal,
+        updateMonthlyGoal,
+        setNonRecurringExpenses
+      );
     }
 
-    setNonRecurringExpenses((prev) => [...prev, newEntry]);
-
-    setCurrentCategory("");
-    setCurrentTags([]);
-    setCurrentDate(todaysDate);
-    setCurrentAmount(null);
-    setCurrentNotes("");
-    window.location.reload();
+    resetFormState(
+      setCurrentCategory,
+      setCurrentTags,
+      setCurrentDate,
+      setCurrentAmount,
+      setCurrentNotes
+    );
   } else {
     alert("Please ensure all fields are filled in.");
   }
 };
 
+function createNewEntry(
+  category: string,
+  tags: string[],
+  date: string,
+  dateTime: Timestamp,
+  value: number,
+  type: "expense" | "refund",
+  notes: string,
+  goalFrom: number
+): NonRecurringEntry {
+  return {
+    category,
+    tags,
+    date,
+    dateTime,
+    value,
+    type,
+    notes,
+    goalFrom,
+    goalTo: type === "expense" ? goalFrom - value : goalFrom + value,
+  };
+}
+
+function sortEntries(entries: NonRecurringEntry[]): NonRecurringEntry[] {
+  return entries.sort((a, b) => {
+    const aTime = a.dateTime.toDate().getTime();
+    const bTime = b.dateTime.toDate().getTime();
+    return aTime - bTime;
+  });
+}
+
+async function recalculateAndUpdateEntries(
+  entries: NonRecurringEntry[],
+  setNonRecurringExpenses: React.Dispatch<React.SetStateAction<NonRecurringEntry[]>>,
+  setMonthlyGoal: React.Dispatch<React.SetStateAction<number>>,
+  updateMonthlyGoal: (value: number) => Promise<void>
+): Promise<void> {
+  let runningTotal = entries[0].goalTo;
+  entries.forEach((entry, index) => {
+    if (index !== 0) {
+      entry.goalFrom = runningTotal;
+      runningTotal =
+        entry.type === "expense"
+          ? runningTotal! - entry.value
+          : runningTotal! + entry.value;
+      entry.goalTo = runningTotal;
+    }
+  });
+
+  await updateEntries(entries);
+  const lastEntryGoalTo = entries[entries.length - 1].goalTo || 0;
+  setMonthlyGoal(lastEntryGoalTo);
+  updateMonthlyGoal(lastEntryGoalTo);
+  setNonRecurringExpenses(entries);
+}
+
+async function addLatestEntry(
+  newEntry: NonRecurringEntry,
+  type: "expense" | "refund",
+  setMonthlyGoal: React.Dispatch<React.SetStateAction<number>>,
+  updateMonthlyGoal: (value: number) => Promise<void>,
+  setNonRecurringExpenses: React.Dispatch<React.SetStateAction<NonRecurringEntry[]>>
+): Promise<void> {
+  const newEntryDocRef =
+    type === "expense"
+      ? await addNonRecurringExpense(newEntry)
+      : await addNonRecurringRefund(newEntry);
+  newEntry.docId = newEntryDocRef.id;
+
+  setMonthlyGoal(newEntry.goalTo || 0);
+  updateMonthlyGoal(newEntry.goalTo || 0);
+  setNonRecurringExpenses((prev) => [...prev, newEntry]);
+}
+
+function resetFormState(
+  setCurrentCategory: React.Dispatch<React.SetStateAction<string>>,
+  setCurrentTags: React.Dispatch<React.SetStateAction<string[]>>,
+  setCurrentDate: React.Dispatch<React.SetStateAction<string>>,
+  setCurrentAmount: React.Dispatch<React.SetStateAction<number | null>>,
+  setCurrentNotes: React.Dispatch<React.SetStateAction<string>>
+): void {
+  setCurrentCategory("");
+  setCurrentTags([]);
+  setCurrentDate(todaysDate);
+  setCurrentAmount(null);
+  setCurrentNotes("");
+}
+
 export const calculateTotals = (
   incomes: RecurringEntry[],
-  expenses: RecurringEntry[],
+  expenses: RecurringEntry[]
 ) => {
   const totalIncome = incomes.reduce(
     (acc: number, curr: RecurringEntry) => acc + curr.value,
-    0,
+    0
   );
   const tithing: RecurringEntry = {
     name: "Tithing",
@@ -162,7 +280,7 @@ export const calculateTotals = (
   const totalExpense =
     expenses.reduce(
       (acc: number, curr: RecurringEntry) => acc + curr.value,
-      0,
+      0
     ) + tithing.value;
 
   const monthlyIncome = totalIncome;

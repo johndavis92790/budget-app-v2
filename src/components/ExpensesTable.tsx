@@ -76,8 +76,7 @@ const ExpensesTable: React.FC<Props> = ({
                 </div>
                 <div>
                   <span className="small-font">
-                    {/* {formatAsCurrency(expense.balance)} */}
-                    $1,000.00
+                    {formatAsCurrency(expense.goalTo!)}
                   </span>
                 </div>
                 <div className="small-font">

@@ -1,13 +1,6 @@
 import React, { useState } from "react";
-import {
-  addTag,
-  generateFiscalYearsData,
-} from "../utils/FirebaseHelpers";
-import {
-  formatAsCurrency,
-  handleNewEntry,
-  todaysDate,
-} from "../utils/Helpers";
+import { addTag, generateFiscalYearsData } from "../utils/FirebaseHelpers";
+import { formatAsCurrency, handleNewEntry, todaysDate } from "../utils/Helpers";
 import { FiscalCalendar } from "./FiscalCalendar";
 import ExpenseRefundCard from "./ExpenseRefundCard";
 import { useExpensesData } from "../utils/hooks/useExpensesData";
@@ -44,13 +37,13 @@ const NonRecurringExpensesPage: React.FC = () => {
       setCurrentTags,
       setCurrentDate,
       setCurrentAmount,
-      setCurrentNotes
+      setCurrentNotes,
     );
   };
 
   const totalExpenses = nonRecurringExpenses.reduce(
     (acc, curr) => acc + curr.value,
-    0
+    0,
   );
 
   const handleOptionChange = (setter: (value: any) => void) => {
@@ -73,7 +66,7 @@ const NonRecurringExpensesPage: React.FC = () => {
     newItem: string,
     existingItems: string[],
     addFunction: (item: string) => Promise<void>,
-    setter: (value: string[] | ((prev: string[]) => string[])) => void
+    setter: (value: string[] | ((prev: string[]) => string[])) => void,
   ) => {
     if (!existingItems.includes(newItem)) {
       addFunction(newItem).then(() => {

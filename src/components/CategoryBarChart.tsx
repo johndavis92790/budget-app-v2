@@ -24,7 +24,9 @@ export function CategoryBarChart(props: CategoryBarChartProps) {
   const getChartData = () => {
     const categorySums = getCategorySums();
 
-    const sortedEntries = Object.entries(categorySums).sort((a, b) => b[1] - a[1]);
+    const sortedEntries = Object.entries(categorySums).sort(
+      (a, b) => b[1] - a[1],
+    );
 
     return [
       ["Category", "Money Spent"],

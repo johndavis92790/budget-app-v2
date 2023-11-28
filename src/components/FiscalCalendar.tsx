@@ -18,10 +18,10 @@ export const FiscalCalendar: React.FC = () => {
           newEvents.push({
             ...week,
             startDate: new Date(
-              new Date(week.start).setDate(new Date(week.start).getDate() + 1)
+              new Date(week.start).setDate(new Date(week.start).getDate() + 1),
             ),
             endDate: new Date(
-              new Date(week.end).setDate(new Date(week.end).getDate() + 1)
+              new Date(week.end).setDate(new Date(week.end).getDate() + 1),
             ),
           });
         });
