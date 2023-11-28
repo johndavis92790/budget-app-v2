@@ -17,6 +17,8 @@ import {
   writeBatch,
   orderBy,
   limit,
+  DocumentSnapshot,
+  DocumentData,
 } from "firebase/firestore";
 import { firestore } from "./firebase";
 import { RecurringEntry, NonRecurringEntry, ordinal } from "./Helpers";
@@ -665,3 +667,65 @@ export const updateEntries = async (
     });
   });
 };
+
+export async function updateFiscalWeekWithExpense(
+  expenseDate: string,
+  expenseDocId: string,
+): Promise<void> {
+  console.log("updateFiscalWeekWithExpense - Start", {
+    expenseDate,
+    expenseDocId,
+  });
+
+  // Calculate the start date of the fiscal week based on expenseDate
+  // (This logic depends on how your fiscal weeks are defined)
+  const fiscalWeekStartDate = calculateFiscalWeekStartDate(expenseDate);
+
+  const fiscalWeeksCol = collection(firestore, "fiscalWeeks");
+  const q = query(fiscalWeeksCol, where("start", "==", fiscalWeekStartDate));
+  console.log("Optimized query for fiscal week", { query: q });
+
+  const querySnapshot = await getDocs(q);
+  console.log(
+    "Query executed, number of docs found:",
+    querySnapshot.docs.length,
+  );
+
+  if (!querySnapshot.empty) {
+    const fiscalWeekDoc = querySnapshot.docs[0];
+    const fiscalWeekRef = doc(firestore, "fiscalWeeks", fiscalWeekDoc.id);
+
+    const expenseRef = doc(firestore, "nonRecurringExpenses", expenseDocId);
+
+    console.log("Updating fiscal week document:", fiscalWeekRef);
+    await updateDoc(fiscalWeekRef, {
+      nonRecurringEntries: arrayUnion(expenseRef), // Add the expense reference
+    });
+    console.log("Fiscal week document updated successfully");
+  } else {
+    console.log("No matching fiscal week found for the given expense date.");
+  }
+
+  console.log("updateFiscalWeekWithExpense - End");
+}
+
+function calculateFiscalWeekStartDate(expenseDate: string): string {
+  // Parse the expenseDate as a Date object
+  const expenseDateObj = new Date(expenseDate);
+
+  // Calculate the day of the week (0 = Sunday, 1 = Monday, ..., 6 = Saturday)
+  const dayOfWeek = expenseDateObj.getUTCDay();
+
+  // Calculate the number of days to subtract to get to the start of the fiscal week (Sunday)
+  const daysToSubtract = dayOfWeek;
+
+  // Calculate the start date of the fiscal week by subtracting days
+  const fiscalWeekStartDate = new Date(expenseDateObj);
+  fiscalWeekStartDate.setUTCDate(expenseDateObj.getUTCDate() - daysToSubtract);
+
+  // Format the fiscalWeekStartDate as a string in the same format as your fiscal weeks
+  // Example: "yyyy-MM-dd"
+  const formattedStartDate = fiscalWeekStartDate.toISOString().split("T")[0];
+
+  return formattedStartDate;
+}

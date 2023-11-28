@@ -7,6 +7,7 @@ import {
   fetchEntriesAfterDate,
   fetchMostRecentEntryBeforeDate,
   updateEntries,
+  updateFiscalWeekWithExpense,
   updateMonthlyGoal,
 } from "./FirebaseHelpers";
 
@@ -158,14 +159,18 @@ export const handleNewEntry = async (
         updateMonthlyGoal,
       );
     } else {
-      addLatestEntry(
-        newEntry,
-        type,
-        setMonthlyGoal,
-        updateMonthlyGoal,
-        setNonRecurringExpenses,
-      );
+      const newEntryDocRef = await (type === "expense"
+        ? addNonRecurringExpense(newEntry)
+        : addNonRecurringRefund(newEntry));
+      newEntry.docId = newEntryDocRef.id;
+
+      setMonthlyGoal(newEntry.goalTo || 0);
+      updateMonthlyGoal(newEntry.goalTo || 0);
+      setNonRecurringExpenses((prev) => [...prev, newEntry]);
     }
+
+    // Update fiscal week for both cases (entryDate before today and not)
+    await updateFiscalWeekWithExpense(newEntry.date, newEntry.docId);
 
     resetFormState(
       setCurrentCategory,
