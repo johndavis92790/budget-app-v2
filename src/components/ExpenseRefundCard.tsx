@@ -2,6 +2,7 @@ import React from "react";
 import CreatableSelect from "react-select/creatable";
 import { Card, Button } from "react-bootstrap";
 import CurrencyInput from "./CurrencyInput";
+import { todaysDate } from "../utils/Helpers";
 
 interface ExpenseRefundCardProps {
   categories: string[];
@@ -83,6 +84,7 @@ const ExpenseRefundCard: React.FC<ExpenseRefundCardProps> = (props) => {
           onChange={(e) => props.setCurrentDate(e.target.value)}
           required
           className="form-control mb-3"
+          max={todaysDate}
         />
         <input
           type="text"

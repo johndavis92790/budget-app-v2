@@ -17,8 +17,10 @@ const ExpensesTable: React.FC<Props> = ({
 }) => {
   // Sort expenses by date in descending order
   const sortedExpenses = displayedExpenses.sort((a, b) => {
-    const dateA = new Date(a.date);
-    const dateB = new Date(b.date);
+    // Convert Firestore Timestamps to JavaScript Date objects
+    const dateA = a.dateTime.toDate();
+    const dateB = b.dateTime.toDate();
+
     return dateB.getTime() - dateA.getTime();
   });
 

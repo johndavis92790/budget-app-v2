@@ -1,15 +1,16 @@
-import { Timestamp } from "firebase/firestore";
+import { DocumentReference, Timestamp, doc } from "firebase/firestore";
 import {
   addCategory,
   addNonRecurringExpense,
   addNonRecurringRefund,
   addTag,
+  calculateFiscalWeekRef,
   fetchEntriesAfterDate,
   fetchMostRecentEntryBeforeDate,
   updateEntries,
-  updateFiscalWeekWithExpense,
   updateMonthlyGoal,
 } from "./FirebaseHelpers";
+import { firestore } from "./firebase";
 
 export function formatAsCurrency(value: number) {
   return new Intl.NumberFormat("en-US", {
@@ -51,6 +52,7 @@ export type NonRecurringEntry = {
   notes: string;
   goalFrom?: number;
   goalTo?: number;
+  fiscalWeekRef?: DocumentReference;
 };
 
 export type RecurringEntry = {
@@ -58,7 +60,15 @@ export type RecurringEntry = {
   value: number;
 };
 
-export const todaysDate = new Date().toISOString().split("T")[0];
+export const todaysDate = new Date()
+  .toLocaleDateString("en-CA", {
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  })
+  .split("/")
+  .reverse()
+  .join("-");
 
 export function formatDate(dateString: string): string {
   const [year, month, day] = dateString.split("-").map((s) => parseInt(s, 10));
@@ -121,18 +131,40 @@ export const handleNewEntry = async (
     currentDate &&
     currentAmount !== null
   ) {
-    const selectedDateTimestamp = Timestamp.fromDate(
-      new Date(currentDate + "T00:00:00"),
-    );
+    let selectedDateTimestamp;
     const entryDate = new Date(currentDate);
     const today = new Date(todaysDate);
 
-    const mostRecentEntryBefore =
-      await fetchMostRecentEntryBeforeDate(currentDate);
+    // Reset the time components to 0 to compare only the date part
+    entryDate.setHours(0, 0, 0, 0);
+    today.setHours(0, 0, 0, 0);
+    if (entryDate.getTime() === today.getTime()) {
+      selectedDateTimestamp = Timestamp.now();
+    } else {
+      const currentTime = new Date();
+      const selectedDate = new Date(currentDate);
+
+      // Set the time of selectedDate to the current time
+      selectedDate.setHours(
+        currentTime.getHours(),
+        currentTime.getMinutes(),
+        currentTime.getSeconds(),
+        currentTime.getMilliseconds(),
+      );
+
+      selectedDateTimestamp = Timestamp.fromDate(selectedDate);
+    }
+
+    const mostRecentEntryBefore = await fetchMostRecentEntryBeforeDate(
+      selectedDateTimestamp,
+    );
     const goalFrom = mostRecentEntryBefore
       ? mostRecentEntryBefore.goalTo!
       : monthlyGoal;
-
+    const fiscalWeekString: string = calculateFiscalWeekRef(currentDate);
+    const fiscalWeekRef: DocumentReference | undefined = fiscalWeekString
+      ? doc(firestore, "fiscalWeeks", fiscalWeekString)
+      : undefined;
     let newEntry = createNewEntry(
       currentCategory,
       currentTags,
@@ -142,15 +174,18 @@ export const handleNewEntry = async (
       type,
       currentNotes,
       goalFrom,
+      fiscalWeekRef!,
     );
 
-    if (entryDate < today) {
-      const newEntryDocRef = await (type === "expense"
-        ? addNonRecurringExpense(newEntry)
-        : addNonRecurringRefund(newEntry));
-      newEntry.docId = newEntryDocRef.id;
+    const newEntryDocRef = await (type === "expense"
+      ? addNonRecurringExpense(newEntry)
+      : addNonRecurringRefund(newEntry));
+    newEntry.docId = newEntryDocRef.id;
 
-      const subsequentEntries = await fetchEntriesAfterDate(currentDate);
+    if (entryDate < today) {
+      const subsequentEntries = await fetchEntriesAfterDate(
+        selectedDateTimestamp,
+      );
       const allEntries = sortEntries([newEntry, ...subsequentEntries]);
       recalculateAndUpdateEntries(
         allEntries,
@@ -159,18 +194,10 @@ export const handleNewEntry = async (
         updateMonthlyGoal,
       );
     } else {
-      const newEntryDocRef = await (type === "expense"
-        ? addNonRecurringExpense(newEntry)
-        : addNonRecurringRefund(newEntry));
-      newEntry.docId = newEntryDocRef.id;
-
       setMonthlyGoal(newEntry.goalTo || 0);
       updateMonthlyGoal(newEntry.goalTo || 0);
       setNonRecurringExpenses((prev) => [...prev, newEntry]);
     }
-
-    // Update fiscal week for both cases (entryDate before today and not)
-    await updateFiscalWeekWithExpense(newEntry.date, newEntry.docId);
 
     resetFormState(
       setCurrentCategory,
@@ -193,6 +220,7 @@ function createNewEntry(
   type: "expense" | "refund",
   notes: string,
   goalFrom: number,
+  fiscalWeekRef: DocumentReference,
 ): NonRecurringEntry {
   return {
     category,
@@ -204,6 +232,7 @@ function createNewEntry(
     notes,
     goalFrom,
     goalTo: type === "expense" ? goalFrom - value : goalFrom + value,
+    fiscalWeekRef,
   };
 }
 
@@ -240,26 +269,6 @@ async function recalculateAndUpdateEntries(
   setMonthlyGoal(lastEntryGoalTo);
   updateMonthlyGoal(lastEntryGoalTo);
   setNonRecurringExpenses(entries);
-}
-
-async function addLatestEntry(
-  newEntry: NonRecurringEntry,
-  type: "expense" | "refund",
-  setMonthlyGoal: React.Dispatch<React.SetStateAction<number>>,
-  updateMonthlyGoal: (value: number) => Promise<void>,
-  setNonRecurringExpenses: React.Dispatch<
-    React.SetStateAction<NonRecurringEntry[]>
-  >,
-): Promise<void> {
-  const newEntryDocRef =
-    type === "expense"
-      ? await addNonRecurringExpense(newEntry)
-      : await addNonRecurringRefund(newEntry);
-  newEntry.docId = newEntryDocRef.id;
-
-  setMonthlyGoal(newEntry.goalTo || 0);
-  updateMonthlyGoal(newEntry.goalTo || 0);
-  setNonRecurringExpenses((prev) => [...prev, newEntry]);
 }
 
 function resetFormState(

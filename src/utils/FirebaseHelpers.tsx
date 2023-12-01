@@ -17,6 +17,7 @@ import {
   writeBatch,
   orderBy,
   limit,
+  Timestamp,
 } from "firebase/firestore";
 import { firestore } from "./firebase";
 import { RecurringEntry, NonRecurringEntry, ordinal } from "./Helpers";
@@ -609,11 +610,11 @@ async function findYearDocRef(
 }
 
 export const fetchEntriesAfterDate = async (
-  date: string,
+  date: Timestamp,
 ): Promise<NonRecurringEntry[]> => {
   try {
-    const entriesRef = collection(firestore, "nonRecurringExpenses"); // Ensure this matches your collection name
-    const q = query(entriesRef, where("date", ">", date));
+    const entriesRef = collection(firestore, "nonRecurringExpenses");
+    const q = query(entriesRef, where("dateTime", ">", date));
     const querySnapshot = await getDocs(q);
     console.log(
       "querySnapshot",
@@ -626,18 +627,18 @@ export const fetchEntriesAfterDate = async (
     );
   } catch (error) {
     console.error("Error fetching entries after date:", error);
-    throw error; // Or handle it as needed
+    throw error;
   }
 };
 
 export async function fetchMostRecentEntryBeforeDate(
-  date: string,
+  date: Timestamp,
 ): Promise<NonRecurringEntry | null> {
   const entriesRef = collection(firestore, "nonRecurringExpenses");
   const q = query(
     entriesRef,
-    where("date", "<", date),
-    orderBy("date", "desc"),
+    where("dateTime", "<", date),
+    orderBy("dateTime", "desc"),
     limit(1),
   );
   const querySnapshot = await getDocs(q);
@@ -666,48 +667,7 @@ export const updateEntries = async (
   });
 };
 
-export async function updateFiscalWeekWithExpense(
-  expenseDate: string,
-  expenseDocId: string,
-): Promise<void> {
-  console.log("updateFiscalWeekWithExpense - Start", {
-    expenseDate,
-    expenseDocId,
-  });
-
-  // Calculate the start date of the fiscal week based on expenseDate
-  // (This logic depends on how your fiscal weeks are defined)
-  const fiscalWeekStartDate = calculateFiscalWeekStartDate(expenseDate);
-
-  const fiscalWeeksCol = collection(firestore, "fiscalWeeks");
-  const q = query(fiscalWeeksCol, where("start", "==", fiscalWeekStartDate));
-  console.log("Optimized query for fiscal week", { query: q });
-
-  const querySnapshot = await getDocs(q);
-  console.log(
-    "Query executed, number of docs found:",
-    querySnapshot.docs.length,
-  );
-
-  if (!querySnapshot.empty) {
-    const fiscalWeekDoc = querySnapshot.docs[0];
-    const fiscalWeekRef = doc(firestore, "fiscalWeeks", fiscalWeekDoc.id);
-
-    const expenseRef = doc(firestore, "nonRecurringExpenses", expenseDocId);
-
-    console.log("Updating fiscal week document:", fiscalWeekRef);
-    await updateDoc(fiscalWeekRef, {
-      nonRecurringEntries: arrayUnion(expenseRef), // Add the expense reference
-    });
-    console.log("Fiscal week document updated successfully");
-  } else {
-    console.log("No matching fiscal week found for the given expense date.");
-  }
-
-  console.log("updateFiscalWeekWithExpense - End");
-}
-
-function calculateFiscalWeekStartDate(expenseDate: string): string {
+export function calculateFiscalWeekRef(expenseDate: string): string {
   // Parse the expenseDate as a Date object
   const expenseDateObj = new Date(expenseDate);
 
@@ -717,13 +677,23 @@ function calculateFiscalWeekStartDate(expenseDate: string): string {
   // Calculate the number of days to subtract to get to the start of the fiscal week (Sunday)
   const daysToSubtract = dayOfWeek;
 
-  // Calculate the start date of the fiscal week by subtracting days
+  // Calculate the start date of the fiscal week by subtracting daysToSubtract from expenseDateObj
   const fiscalWeekStartDate = new Date(expenseDateObj);
   fiscalWeekStartDate.setUTCDate(expenseDateObj.getUTCDate() - daysToSubtract);
 
-  // Format the fiscalWeekStartDate as a string in the same format as your fiscal weeks
-  // Example: "yyyy-MM-dd"
+  // Format the fiscalWeekStartDate as a string in 'yyyy-MM-dd' format, representing the beginning of the fiscal week
   const formattedStartDate = fiscalWeekStartDate.toISOString().split("T")[0];
 
-  return formattedStartDate;
+  // Calculate the end date of the fiscal week by adding 6 days to the start date
+  const fiscalWeekEndDate = new Date(fiscalWeekStartDate);
+  fiscalWeekEndDate.setUTCDate(fiscalWeekStartDate.getUTCDate() + 6);
+
+  // Format the fiscalWeekEndDate as a string in 'yyyy-MM-dd' format, representing the end of the fiscal week
+  const formattedEndDate = fiscalWeekEndDate.toISOString().split("T")[0];
+
+  // Concatenate formattedStartDate and formattedEndDate to form the fiscalWeekRefString
+  const fiscalWeekRefString = formattedStartDate + "_" + formattedEndDate;
+
+  // Return the fiscal week reference string
+  return fiscalWeekRefString;
 }
