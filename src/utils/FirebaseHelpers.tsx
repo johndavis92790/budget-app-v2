@@ -21,6 +21,7 @@ import {
 } from "firebase/firestore";
 import { firestore } from "./firebase";
 import { RecurringEntry, NonRecurringEntry, ordinal } from "./Helpers";
+import { tagsList, tagsMapping } from "./jsonTest";
 
 export interface WeekData {
   weekNumber: number;
@@ -35,6 +36,7 @@ export interface WeekData {
   yearString?: string;
   month?: DocumentReference;
   monthString?: string;
+  goal?: number;
 }
 
 export interface MonthData {
@@ -45,6 +47,7 @@ export interface MonthData {
   year?: DocumentReference;
   yearString: string;
   docId?: string;
+  autoFunds?: number;
 }
 
 export interface YearData {
@@ -697,3 +700,99 @@ export function calculateFiscalWeekRef(expenseDate: string): string {
   // Return the fiscal week reference string
   return fiscalWeekRefString;
 }
+
+// Function to convert MongoDB data to Firestore NonRecurringEntry format
+export const convertToNonRecurringEntry = (
+  mongoData: any[],
+): NonRecurringEntry[] => {
+  // Sort entries chronologically by date
+  const sortedData = mongoData.sort(
+    (a, b) =>
+      new Date(a.date.$date).getTime() - new Date(b.date.$date).getTime(),
+  );
+
+  return sortedData.flatMap((entry, index, array) => {
+    if (
+      entry.type === "Changed Fiscal Monthly Auto Funds" ||
+      entry.type === "Custom Number"
+    ) {
+      // Skip these types of entries
+      return [];
+    }
+
+    const date = new Date(entry.date.$date);
+    const dateString = date.toISOString().split("T")[0]; // Format date as 'yyyy-MM-dd'
+    const dateTime = Timestamp.fromDate(date); // Convert to Firestore Timestamp
+    const value = Math.abs(entry.amount) / 100; // Convert cents to positive dollars
+    const type = entry.type.toLowerCase(); // Convert type to lowercase
+    const notes = entry.notes;
+
+    // Check if notes is defined and a string, otherwise use an empty array
+    const tagStrings = typeof notes === "string" ? notes.split(/\s+/) : [];
+    const tags = processTags(tagStrings);
+
+    let goalFrom;
+    let goalTo = entry.funds / 100;
+
+    switch (entry.type) {
+      case "Expense":
+        goalFrom = (entry.funds + Math.abs(entry.amount)) / 100;
+        break;
+      case "Refund":
+      case "Added Funds":
+        goalFrom = (entry.funds - entry.amount) / 100;
+        break;
+      case "Custom Fiscal Monthly Amount":
+        const previousGoalTo = index > 0 ? array[index - 1].funds / 100 : 0;
+        goalFrom = previousGoalTo;
+        break;
+    }
+
+    const fiscalWeekString: string = calculateFiscalWeekRef(dateString);
+    const fiscalWeekRef: DocumentReference | undefined = fiscalWeekString
+      ? doc(firestore, "fiscalWeeks", fiscalWeekString)
+      : undefined;
+
+    return {
+      category: entry.category,
+      tags,
+      date: dateString,
+      dateTime,
+      value,
+      type,
+      notes,
+      goalFrom,
+      goalTo,
+      fiscalWeekRef,
+    };
+  });
+};
+
+const capitalizeFirstLetter = (string: string) => {
+  return string.charAt(0).toUpperCase() + string.slice(1);
+};
+
+const processTags = (tags: string[]): string[] => {
+  const processedTags = tags.reduce((acc: string[], tag) => {
+    // Check for matches in tagsMapping
+    const mapping = tagsMapping.find((m) => m.matchesArray.includes(tag));
+    if (mapping) {
+      acc.push(mapping.tagString);
+      return acc;
+    }
+
+    // Check for matches in tagsList and capitalize if needed
+    if (tagsList.includes(tag)) {
+      acc.push(
+        tag[0] === tag[0].toLowerCase() ? capitalizeFirstLetter(tag) : tag,
+      );
+      return acc;
+    }
+
+    // Tag does not match any condition, so it's not added
+    return acc;
+  }, []);
+
+  // Remove duplicates by converting to a Set and back to an array
+  return Array.from(new Set(processedTags));
+};

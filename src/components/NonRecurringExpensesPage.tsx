@@ -1,11 +1,21 @@
 import React, { useState } from "react";
-import { addTag, generateFiscalYearsData } from "../utils/FirebaseHelpers";
-import { formatAsCurrency, handleNewEntry, todaysDate } from "../utils/Helpers";
+import {
+  addTag,
+  convertToNonRecurringEntry,
+  generateFiscalYearsData,
+} from "../utils/FirebaseHelpers";
+import {
+  NonRecurringEntry,
+  formatAsCurrency,
+  handleNewEntry,
+  todaysDate,
+} from "../utils/Helpers";
 import { FiscalCalendar } from "./FiscalCalendar";
 import ExpenseRefundCard from "./ExpenseRefundCard";
 import { useExpensesData } from "../utils/hooks/useExpensesData";
 import { useCategoriesAndTags } from "../utils/hooks/useCategoriesAndTags";
 import { useGoals } from "../utils/hooks/useGoals";
+import { jsonString } from "../utils/jsonTest";
 
 const NonRecurringExpensesPage: React.FC = () => {
   const { nonRecurringExpenses, setNonRecurringExpenses } = useExpensesData();
@@ -81,6 +91,34 @@ const NonRecurringExpensesPage: React.FC = () => {
     setCurrentAmount(Number(value));
   };
 
+  // // Main function to perform the conversion and log results
+  // const main = async () => {
+  //   console.log(typeof jsonString);
+  //   const convertedData = convertToNonRecurringEntry(
+  //     JSON.parse(convertStringToJsonArray(jsonString))
+  //   );
+  //   console.log(convertedData); // Log the results
+  //   // const uniqueTags = extractUniqueTags(convertedData);
+  //   // console.log(uniqueTags);
+
+  // };
+
+  // function convertStringToJsonArray(str: string): string {
+  //   if (typeof str !== "string") {
+  //     console.error("Invalid input type:", typeof str);
+  //     return "[]"; // Return an empty JSON array string as a fallback
+  //   }
+  //   const objects = str.split("\n").filter((obj) => obj.trim() !== "");
+  //   return "[" + objects.join(",") + "]";
+  // }
+
+  // const extractUniqueTags = (data: NonRecurringEntry[]) => {
+  //   const allTags = data
+  //     .map((entry) => (entry.notes ? entry.notes.split(/\s+/) : []))
+  //     .reduce((acc, tags) => acc.concat(tags), []);
+  //   return Array.from(new Set(allTags)); // Convert Set to Array;
+  // };
+
   return (
     <div className="p-2">
       <h1>Non-Recurring Expenses</h1>
@@ -88,6 +126,7 @@ const NonRecurringExpensesPage: React.FC = () => {
       {/* <button onClick={() => generateFiscalYearsData(2021, 60)}>
         Generate Fiscal Data
       </button> */}
+      {/* <button onClick={() => main().catch(console.error)}>convert data</button> */}
 
       {/* TODO Progress bar?? */}
       <progress
