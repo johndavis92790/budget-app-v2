@@ -13,10 +13,10 @@ type MonthlyAddedFunds = {
   oldFunds: number;
   newFunds: number;
   addedFunds: number;
-  fiscalMonth: DocumentReference,
+  fiscalMonth: DocumentReference;
   date: Timestamp;
   notes: string;
-}
+};
 
 admin.initializeApp();
 
@@ -96,12 +96,10 @@ exports.updateMonthlyGoal = functions.pubsub
         addedFunds: Number(monthlyFunds),
         fiscalMonth: fiscalMonthDoc.ref,
         date: Timestamp.now(),
-        notes: ""
+        notes: "",
       });
 
-      console.log(
-        "monthlyAddedFunds document added successfully"
-      );
+      console.log("monthlyAddedFunds document added successfully");
     } catch (error) {
       console.error("Error: ", error);
     }
