@@ -96,6 +96,7 @@ exports.updateMonthlyGoal = functions.pubsub
         addedFunds: Number(monthlyFunds),
         fiscalMonth: fiscalMonthDoc.ref,
         date: Timestamp.now(),
+        notes: ""
       });
 
       console.log(
