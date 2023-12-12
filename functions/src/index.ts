@@ -22,7 +22,6 @@ admin.initializeApp();
 
 exports.updateMonthlyGoal = functions.pubsub
   .schedule("every 28 days at 3:00")
-  // .schedule("every 1 minutes")
   .timeZone("America/Denver")
   .onRun(async () => {
     const db = admin.firestore();
