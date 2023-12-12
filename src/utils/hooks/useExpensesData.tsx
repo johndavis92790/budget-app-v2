@@ -1,9 +1,11 @@
 import { useState, useEffect } from "react";
-import { fetchNonRecurringExpenses } from "../FirebaseHelpers";
-import { NonRecurringEntry } from "../Helpers";
+import {
+  NonRecurringEntry,
+  fetchnonRecurringEntries,
+} from "../FirebaseHelpers";
 
 export const useExpensesData = () => {
-  const [nonRecurringExpenses, setNonRecurringExpenses] = useState<
+  const [nonRecurringEntries, setnonRecurringEntries] = useState<
     NonRecurringEntry[]
   >([]);
   const [minExpense, setMinExpense] = useState<number>(0);
@@ -11,8 +13,8 @@ export const useExpensesData = () => {
   const [amountRange, setAmountRange] = useState<[number, number]>([0, 100]);
 
   useEffect(() => {
-    fetchNonRecurringExpenses().then((expenses) => {
-      setNonRecurringExpenses(expenses);
+    fetchnonRecurringEntries().then((expenses) => {
+      setnonRecurringEntries(expenses);
       if (expenses.length > 0) {
         const values = expenses.map((exp) => exp.value);
         const min = Math.floor(Math.min(...values));
@@ -28,8 +30,8 @@ export const useExpensesData = () => {
   }, [amountRange]);
 
   return {
-    nonRecurringExpenses,
-    setNonRecurringExpenses,
+    nonRecurringEntries,
+    setnonRecurringEntries,
     minExpense,
     maxExpense,
     amountRange,

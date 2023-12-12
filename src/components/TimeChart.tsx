@@ -1,5 +1,6 @@
 import { Chart } from "react-google-charts";
-import { NonRecurringEntry, shortMonths } from "../utils/Helpers";
+import { shortMonths } from "../utils/Helpers";
+import { NonRecurringEntry } from "../utils/FirebaseHelpers";
 
 interface TimeChartProps {
   filteredExpenses: NonRecurringEntry[];

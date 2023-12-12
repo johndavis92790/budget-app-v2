@@ -1,8 +1,9 @@
 import React from "react";
 import { Form, Modal, Button } from "react-bootstrap";
 import Select from "react-select";
-import { NonRecurringEntry, formatAsCurrency } from "../utils/Helpers";
+import { formatAsCurrency } from "../utils/Helpers";
 import CurrencyInput from "./CurrencyInput";
+import { NonRecurringEntry } from "../utils/FirebaseHelpers";
 
 type ExpenseModalProps = {
   showModal: boolean;

@@ -3,6 +3,7 @@ import { Calendar as BigCalendar, momentLocalizer } from "react-big-calendar";
 import moment from "moment";
 import "react-big-calendar/lib/css/react-big-calendar.css";
 import { WeekData, fetchFiscalWeekEvents } from "../utils/FirebaseHelpers";
+import { formatAsCurrency } from "../utils/Helpers";
 
 const localizer = momentLocalizer(moment);
 
@@ -40,11 +41,24 @@ export const FiscalCalendar: React.FC = () => {
       const newEvents = createWeeklyEvents(fetchedYearWeeks);
 
       setEvents(newEvents);
-      console.log(newEvents);
+      // console.log(newEvents);
     };
 
     fetchData();
   }, [date]);
+
+  function getWeekTitle(event: WeekData, title: string) {
+    if (event.currentGoal !== undefined && event.setGoal !== undefined) {
+      return (
+        <>
+          {title} - {formatAsCurrency(event.currentGoal)} left of{" "}
+          {formatAsCurrency(event.setGoal)}
+        </>
+      );
+    } else {
+      return <>{title}</>;
+    }
+  }
 
   return (
     <div style={{ height: 600 }}>
@@ -71,7 +85,7 @@ export const FiscalCalendar: React.FC = () => {
                     justifyContent: "center",
                   }}
                 >
-                  {title}
+                  {getWeekTitle(event, title)}
                 </div>
               );
             }

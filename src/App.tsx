@@ -1,7 +1,6 @@
 import React, { useEffect, useState } from "react";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
 import RecurringExpensesPage from "./components/RecurringExpensesPage";
-import NonRecurringExpensesPage from "./components/NonRecurringExpensesPage";
 import HistoryPage from "./components/HistoryPage";
 import {
   signInWithPopup,
@@ -14,6 +13,7 @@ import { auth } from "./utils/firebase";
 import { Login } from "./components/Login";
 import { UserContext } from "./utils/UserContext";
 import { BudgetNavbar } from "./components/Navbar";
+import { NonRecurringEntriesPage } from "./components/NonRecurringEntriesPage";
 
 const allowedEmails = [
   process.env.REACT_APP_EMAIL_1,
@@ -56,7 +56,7 @@ const App: React.FC = () => {
             <Route path="/recurring" element={<RecurringExpensesPage />} />
             <Route
               path="/non-recurring"
-              element={<NonRecurringExpensesPage />}
+              element={<NonRecurringEntriesPage />}
             />
             <Route path="/history" element={<HistoryPage />} />
             <Route path="login" element={<Login />} />

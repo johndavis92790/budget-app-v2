@@ -1,7 +1,9 @@
 import { DocumentReference, Timestamp, doc } from "firebase/firestore";
 import {
+  NonRecurringEntry,
+  RecurringEntry,
   addCategory,
-  addNonRecurringExpense,
+  addnonRecurringEntry,
   addNonRecurringRefund,
   addTag,
   calculateFiscalWeekRef,
@@ -9,6 +11,7 @@ import {
   fetchMostRecentEntryBeforeDate,
   updateEntries,
   updateMonthlyGoal,
+  updateWeeklyCurrentGoal,
 } from "./FirebaseHelpers";
 import { firestore } from "./firebase";
 
@@ -41,25 +44,6 @@ export const shortMonths = [
   "Dec",
 ];
 
-export type NonRecurringEntry = {
-  docId?: string;
-  category: string;
-  tags: string[];
-  date: string;
-  dateTime: Timestamp;
-  value: number;
-  type: string;
-  notes: string;
-  goalFrom?: number;
-  goalTo?: number;
-  fiscalWeekRef?: DocumentReference;
-};
-
-export type RecurringEntry = {
-  name: string;
-  value: number;
-};
-
 export const todaysDate = new Date()
   .toLocaleDateString("en-CA", {
     year: "numeric",
@@ -70,12 +54,18 @@ export const todaysDate = new Date()
   .reverse()
   .join("-");
 
-export function formatDate(dateString: string): string {
-  const [year, month, day] = dateString.split("-").map((s) => parseInt(s, 10));
-  const dateObj = new Date(year, month - 1, day);
-  const options = { weekday: "short", month: "short", day: "numeric" } as const;
-  return dateObj.toLocaleDateString(undefined, options).replace(",", "");
-}
+export const formatFirestoreTimestamp = (timestamp: Timestamp): string => {
+  if (!timestamp) {
+    return "";
+  }
+  const date = timestamp.toDate(); // Convert to JavaScript Date
+  const options: Intl.DateTimeFormatOptions = {
+    weekday: "short", // 'short', 'long', or 'narrow'
+    month: "short", // 'short', 'long', or 'narrow'
+    day: "numeric", // 'numeric' or '2-digit'
+  };
+  return date.toLocaleDateString("en-US", options); // Format the date
+};
 
 export const handleCurrencyChange = (
   e: React.ChangeEvent<HTMLInputElement>,
@@ -96,11 +86,13 @@ export const handleNewEntry = async (
   currentDate: string,
   currentAmount: number | null,
   currentNotes: string,
+  monthlyGoal: number,
   setMonthlyGoal: React.Dispatch<React.SetStateAction<number>>,
-  setNonRecurringExpenses: React.Dispatch<
+  weeklyGoal: number,
+  setWeeklyGoal: React.Dispatch<React.SetStateAction<number>>,
+  setnonRecurringEntries: React.Dispatch<
     React.SetStateAction<NonRecurringEntry[]>
   >,
-  monthlyGoal: number,
   setCurrentCategory: React.Dispatch<React.SetStateAction<string>>,
   setCurrentTags: React.Dispatch<React.SetStateAction<string[]>>,
   setCurrentDate: React.Dispatch<React.SetStateAction<string>>,
@@ -158,9 +150,12 @@ export const handleNewEntry = async (
     const mostRecentEntryBefore = await fetchMostRecentEntryBeforeDate(
       selectedDateTimestamp,
     );
-    const goalFrom = mostRecentEntryBefore
-      ? mostRecentEntryBefore.goalTo!
+    const monthlyGoalFrom = mostRecentEntryBefore
+      ? mostRecentEntryBefore.monthlyGoalTo!
       : monthlyGoal;
+    const weeklyGoalFrom = mostRecentEntryBefore
+      ? mostRecentEntryBefore.weeklyGoalTo!
+      : weeklyGoal;
     const fiscalWeekString: string = calculateFiscalWeekRef(currentDate);
     const fiscalWeekRef: DocumentReference | undefined = fiscalWeekString
       ? doc(firestore, "fiscalWeeks", fiscalWeekString)
@@ -173,12 +168,13 @@ export const handleNewEntry = async (
       currentAmount,
       type,
       currentNotes,
-      goalFrom,
+      monthlyGoalFrom,
+      weeklyGoalFrom,
       fiscalWeekRef!,
     );
 
     const newEntryDocRef = await (type === "expense"
-      ? addNonRecurringExpense(newEntry)
+      ? addnonRecurringEntry(newEntry)
       : addNonRecurringRefund(newEntry));
     newEntry.docId = newEntryDocRef.id;
 
@@ -188,15 +184,20 @@ export const handleNewEntry = async (
       );
       const allEntries = sortEntries([newEntry, ...subsequentEntries]);
       recalculateAndUpdateEntries(
+        currentDate,
         allEntries,
-        setNonRecurringExpenses,
+        setnonRecurringEntries,
         setMonthlyGoal,
         updateMonthlyGoal,
+        setWeeklyGoal,
+        updateWeeklyCurrentGoal,
       );
     } else {
-      setMonthlyGoal(newEntry.goalTo || 0);
-      updateMonthlyGoal(newEntry.goalTo || 0);
-      setNonRecurringExpenses((prev) => [...prev, newEntry]);
+      setMonthlyGoal(newEntry.monthlyGoalTo || 0);
+      updateMonthlyGoal(newEntry.monthlyGoalTo || 0);
+      setWeeklyGoal(newEntry.weeklyGoalTo || 0);
+      updateWeeklyCurrentGoal(currentDate, newEntry.weeklyGoalTo || 0);
+      setnonRecurringEntries((prev) => [...prev, newEntry]);
     }
 
     resetFormState(
@@ -219,7 +220,8 @@ function createNewEntry(
   value: number,
   type: "expense" | "refund",
   notes: string,
-  goalFrom: number,
+  monthlyGoalFrom: number,
+  weeklyGoalFrom: number,
   fiscalWeekRef: DocumentReference,
 ): NonRecurringEntry {
   return {
@@ -230,8 +232,12 @@ function createNewEntry(
     value,
     type,
     notes,
-    goalFrom,
-    goalTo: type === "expense" ? goalFrom - value : goalFrom + value,
+    monthlyGoalFrom,
+    monthlyGoalTo:
+      type === "expense" ? monthlyGoalFrom - value : monthlyGoalFrom + value,
+    weeklyGoalFrom,
+    weeklyGoalTo:
+      type === "expense" ? weeklyGoalFrom - value : weeklyGoalFrom + value,
     fiscalWeekRef,
   };
 }
@@ -245,30 +251,38 @@ function sortEntries(entries: NonRecurringEntry[]): NonRecurringEntry[] {
 }
 
 async function recalculateAndUpdateEntries(
+  currentDate: string,
   entries: NonRecurringEntry[],
-  setNonRecurringExpenses: React.Dispatch<
+  setnonRecurringEntries: React.Dispatch<
     React.SetStateAction<NonRecurringEntry[]>
   >,
   setMonthlyGoal: React.Dispatch<React.SetStateAction<number>>,
   updateMonthlyGoal: (value: number) => Promise<void>,
+  setWeeklyGoal: React.Dispatch<React.SetStateAction<number>>,
+  updateWeeklyGoal: (currentDate: string, value: number) => Promise<void>,
 ): Promise<void> {
-  let runningTotal = entries[0].goalTo;
+  let runningTotal = entries[0].monthlyGoalTo;
   entries.forEach((entry, index) => {
     if (index !== 0) {
-      entry.goalFrom = runningTotal;
+      entry.monthlyGoalFrom = runningTotal;
+      entry.weeklyGoalFrom = runningTotal;
       runningTotal =
         entry.type === "expense"
           ? runningTotal! - entry.value
           : runningTotal! + entry.value;
-      entry.goalTo = runningTotal;
+      entry.monthlyGoalTo = runningTotal;
+      entry.weeklyGoalTo = runningTotal;
     }
   });
 
   await updateEntries(entries);
-  const lastEntryGoalTo = entries[entries.length - 1].goalTo || 0;
-  setMonthlyGoal(lastEntryGoalTo);
-  updateMonthlyGoal(lastEntryGoalTo);
-  setNonRecurringExpenses(entries);
+  const lastEntryMonthlyGoalTo = entries[entries.length - 1].monthlyGoalTo || 0;
+  setMonthlyGoal(lastEntryMonthlyGoalTo);
+  updateMonthlyGoal(lastEntryMonthlyGoalTo);
+  const lastEntryWeeklyGoalTo = entries[entries.length - 1].weeklyGoalTo || 0;
+  setWeeklyGoal(lastEntryWeeklyGoalTo);
+  updateWeeklyGoal(currentDate, lastEntryWeeklyGoalTo);
+  setnonRecurringEntries(entries);
 }
 
 function resetFormState(

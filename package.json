@@ -39,7 +39,8 @@
     "build": "react-scripts build",
     "build:firebase": "env-cmd -f .env.production react-scripts build",
     "deploy": "git push origin main && npm run build && firebase deploy",
-    "pretty": "prettier --write \"src/**/*.{js,jsx,ts,tsx,json,html,css,scss,md}\""
+    "pretty": "prettier --write \"src/**/*.{js,jsx,ts,tsx,json,html,css,scss,md}\"",
+    "cloudDeploy": "cd functions && firebase deploy --only functions && cd .."
   },
   "eslintConfig": {
     "extends": [

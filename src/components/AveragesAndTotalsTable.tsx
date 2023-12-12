@@ -1,6 +1,7 @@
-import React from "react";
+import React, { useEffect } from "react";
 import { Table } from "react-bootstrap";
 import { formatAsCurrency } from "../utils/Helpers";
+import { updateMonthlyAutoFunds } from "../utils/FirebaseHelpers";
 
 interface AveragesAndTotalsProps {
   monthlyIncome: number;
@@ -21,6 +22,14 @@ const AveragesAndTotalsTable: React.FC<AveragesAndTotalsProps> = ({
   availableFiscalMonthly,
   availableWeekly,
 }) => {
+  useEffect(() => {
+    const formattedAvailableFiscalMonthly = Number(
+      availableFiscalMonthly.toFixed(2),
+    );
+
+    updateMonthlyAutoFunds(formattedAvailableFiscalMonthly);
+  }, [availableFiscalMonthly]);
+
   return (
     <div>
       <h2>Averages and Totals</h2>

@@ -1,6 +1,5 @@
 import { useState, useEffect } from "react";
-import { fetchRecurringEntries } from "../FirebaseHelpers";
-import { RecurringEntry } from "../Helpers";
+import { RecurringEntry, fetchRecurringEntries } from "../FirebaseHelpers";
 
 export const useIncomesAndExpenses = () => {
   const [incomes, setIncomes] = useState<RecurringEntry[]>([]);

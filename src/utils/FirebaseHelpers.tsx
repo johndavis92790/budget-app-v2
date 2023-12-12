@@ -18,12 +18,34 @@ import {
   orderBy,
   limit,
   Timestamp,
+  DocumentData,
 } from "firebase/firestore";
 import { firestore } from "./firebase";
-import { RecurringEntry, NonRecurringEntry, ordinal } from "./Helpers";
+import { ordinal } from "./Helpers";
 import { tagsList, tagsMapping } from "./jsonTest";
 
-export interface WeekData {
+export type NonRecurringEntry = {
+  docId?: string;
+  category: string;
+  tags: string[];
+  date: string;
+  dateTime: Timestamp;
+  value: number;
+  type: string;
+  notes: string;
+  monthlyGoalFrom?: number;
+  monthlyGoalTo?: number;
+  weeklyGoalFrom?: number;
+  weeklyGoalTo?: number;
+  fiscalWeekRef?: DocumentReference;
+};
+
+export type RecurringEntry = {
+  name: string;
+  value: number;
+};
+
+export type WeekData = {
   weekNumber: number;
   start: string;
   startDate?: Date;
@@ -36,10 +58,11 @@ export interface WeekData {
   yearString?: string;
   month?: DocumentReference;
   monthString?: string;
-  goal?: number;
-}
+  setGoal?: number;
+  currentGoal?: number;
+};
 
-export interface MonthData {
+export type MonthData = {
   startDate: string;
   endDate: string;
   weeks?: DocumentReference[];
@@ -48,9 +71,9 @@ export interface MonthData {
   yearString: string;
   docId?: string;
   autoFunds?: number;
-}
+};
 
-export interface YearData {
+export type YearData = {
   year: string;
   startDate: string;
   endDate?: string;
@@ -59,10 +82,33 @@ export interface YearData {
   weeks?: DocumentReference[];
   weekStrings: string[];
   docId?: string;
-}
+};
+
+export type MonthlyAddedFunds = {
+  docId?: string;
+  type: string;
+  oldFunds: number;
+  newFunds: number;
+  addedFunds: number;
+  fiscalMonth: DocumentReference;
+  date: Timestamp;
+  notes: string;
+};
+
+export type WeeklyGoalHistory = {
+  docId?: string;
+  date: Timestamp;
+  fiscalWeek: DocumentReference;
+  newGoal: number;
+};
+
+export type HistoryEntry =
+  | NonRecurringEntry
+  | WeeklyGoalHistory
+  | MonthlyAddedFunds;
 
 export const fetchFiscalWeekEvents = async (
-  years: string[], // Now accepts an array of year strings
+  years: string[],
 ): Promise<WeekData[]> => {
   // Fetch the week events from Firestore that have a yearString within the provided array
   const eventsCollection = collection(firestore, "fiscalWeeks");
@@ -189,10 +235,10 @@ export const deleteRecurringEntry = async (
   }
 };
 
-export const addNonRecurringExpense = async (
+export const addnonRecurringEntry = async (
   entry: NonRecurringEntry,
 ): Promise<DocumentReference> => {
-  const nonRecurringCollection = collection(firestore, "nonRecurringExpenses");
+  const nonRecurringCollection = collection(firestore, "nonRecurringEntries");
   return await addDoc(nonRecurringCollection, {
     ...entry,
     type: "expense",
@@ -202,17 +248,27 @@ export const addNonRecurringExpense = async (
 export const addNonRecurringRefund = async (
   entry: NonRecurringEntry,
 ): Promise<DocumentReference> => {
-  const nonRecurringCollection = collection(firestore, "nonRecurringExpenses");
+  const nonRecurringCollection = collection(firestore, "nonRecurringEntries");
   return await addDoc(nonRecurringCollection, {
     ...entry,
     type: "refund",
   });
 };
 
-export const fetchNonRecurringExpenses = async (): Promise<
+export const addNewFundsEntry = async (
+  entry: NonRecurringEntry,
+): Promise<DocumentReference> => {
+  const nonRecurringCollection = collection(firestore, "nonRecurringEntries");
+  return await addDoc(nonRecurringCollection, {
+    ...entry,
+    type: "new funds",
+  });
+};
+
+export const fetchnonRecurringEntries = async (): Promise<
   NonRecurringEntry[]
 > => {
-  const nonRecurringCollection = collection(firestore, "nonRecurringExpenses");
+  const nonRecurringCollection = collection(firestore, "nonRecurringEntries");
   const nonRecurringSnap = await getDocs(query(nonRecurringCollection));
 
   return nonRecurringSnap.docs.map(
@@ -220,16 +276,16 @@ export const fetchNonRecurringExpenses = async (): Promise<
   );
 };
 
-export const deleteNonRecurringExpense = async (docId: string) => {
-  const nonRecurringRef = doc(firestore, "nonRecurringExpenses", docId);
+export const deletenonRecurringEntry = async (docId: string) => {
+  const nonRecurringRef = doc(firestore, "nonRecurringEntries", docId);
   await deleteDoc(nonRecurringRef);
 };
 
-export const updateNonRecurringExpense = async (
+export const updatenonRecurringEntry = async (
   docId: string,
   entry: NonRecurringEntry,
 ) => {
-  const nonRecurringRef = doc(firestore, "nonRecurringExpenses", docId);
+  const nonRecurringRef = doc(firestore, "nonRecurringEntries", docId);
 
   // Exclude the docId from the entry since it's not needed in the database record.
   const { docId: _, ...entryData } = entry;
@@ -237,30 +293,267 @@ export const updateNonRecurringExpense = async (
   await updateDoc(nonRecurringRef, entryData);
 };
 
-export const fetchCurrentGoal = async (): Promise<number | null> => {
-  const goalRef = doc(firestore, "familyBudget", "currentGoal");
+export const fetchCurrentWeeklyGoal = async (
+  date: string,
+): Promise<number | null> => {
+  // Calculate the fiscal week reference based on the provided date
+  const fiscalWeekRef = calculateFiscalWeekRef(date);
+
+  // Adjust the reference to point to the correct document in the fiscalWeeks collection
+  const goalRef = doc(firestore, "fiscalWeeks", fiscalWeekRef);
   const goalSnap = await getDoc(goalRef);
 
-  if (goalSnap.exists() && typeof goalSnap.data()?.amount === "number") {
-    return goalSnap.data()?.amount;
+  // Check if the document exists and has a weeklyGoal field
+  if (goalSnap.exists() && typeof goalSnap.data()?.currentGoal === "number") {
+    return goalSnap.data()?.currentGoal;
+  } else {
+    return null;
+  }
+};
+
+export const updateWeeklyCurrentGoal = async (
+  date: string,
+  newGoal: number,
+): Promise<void> => {
+  // Calculate the fiscal week reference based on the provided date
+  const fiscalWeekRef = calculateFiscalWeekRef(date);
+
+  // Adjust the reference to point to the correct document in the fiscalWeeks collection
+  const goalRef = doc(firestore, "fiscalWeeks", fiscalWeekRef);
+  const goalSnap = await getDoc(goalRef);
+
+  // Update or set the weeklyGoal field in the document
+  if (goalSnap.exists()) {
+    await updateDoc(goalRef, {
+      currentGoal: Number(newGoal),
+    });
+  } else {
+    await setDoc(goalRef, {
+      currentGoal: Number(newGoal),
+    });
+  }
+};
+
+export const fetchSetWeeklyGoal = async (
+  date: string,
+): Promise<number | null> => {
+  // Calculate the fiscal week reference based on the provided date
+  const fiscalWeekRef = calculateFiscalWeekRef(date);
+
+  // Adjust the reference to point to the correct document in the fiscalWeeks collection
+  const goalRef = doc(firestore, "fiscalWeeks", fiscalWeekRef);
+  const goalSnap = await getDoc(goalRef);
+
+  // Check if the document exists and has a weeklyGoal field
+  if (goalSnap.exists() && typeof goalSnap.data()?.setGoal === "number") {
+    return goalSnap.data()?.setGoal;
+  } else {
+    return null;
+  }
+};
+
+export const updateWeeklySetGoal = async (
+  date: string,
+  newGoal: number,
+): Promise<void> => {
+  // Calculate the fiscal week reference based on the provided date
+  const fiscalWeekRefString = calculateFiscalWeekRef(date);
+
+  // Adjust the reference to point to the correct document in the fiscalWeeks collection
+  const fiscalWeekRef = doc(firestore, "fiscalWeeks", fiscalWeekRefString);
+  const fiscalWeekSnap = await getDoc(fiscalWeekRef);
+
+  await addWeeklySetGoalHistory(fiscalWeekRef, newGoal);
+
+  // Update or set the weeklyGoal field in the document
+  if (fiscalWeekSnap.exists()) {
+    await updateDoc(fiscalWeekRef, {
+      setGoal: Number(newGoal),
+    });
+  } else {
+    await setDoc(fiscalWeekRef, {
+      setGoal: Number(newGoal),
+    });
+  }
+};
+
+export const addWeeklySetGoalHistory = async (
+  fiscalWeekRef: DocumentReference<DocumentData, DocumentData>,
+  newGoal: number,
+): Promise<DocumentReference> => {
+  const weeklySetGoalHistoryCollection = collection(
+    firestore,
+    "weeklySetGoalHistory",
+  );
+  return await addDoc(weeklySetGoalHistoryCollection, {
+    fiscalWeek: fiscalWeekRef,
+    newGoal: Number(newGoal),
+    date: Timestamp.now(),
+  });
+};
+
+export const resetAndDeleteFields = async () => {
+  try {
+    // Reset monthlyGoal in the currentGoals document
+    const currentGoalsRef = doc(firestore, "familyBudget", "currentGoals");
+    await updateDoc(currentGoalsRef, { monthlyGoal: 1000 });
+
+    // Delete setGoal & currentGoal fields from all documents in the fiscalWeeks collection
+    const fiscalWeeksRef = collection(firestore, "fiscalWeeks");
+    const fiscalWeeksSnapshot = await getDocs(fiscalWeeksRef);
+    const fiscalWeeksPromises = fiscalWeeksSnapshot.docs.map(
+      (documentSnapshot) => {
+        const docRef = doc(firestore, "fiscalWeeks", documentSnapshot.id);
+        return updateDoc(docRef, {
+          setGoal: deleteField(),
+          currentGoal: deleteField(),
+        });
+      },
+    );
+
+    await Promise.all(fiscalWeeksPromises);
+    console.log("fiscalWeek goals deleted");
+
+    // Delete autoFunds fields from all documents in the fiscalMonths collection
+    const fiscalMonthsRef = collection(firestore, "fiscalMonths");
+    const fiscalMonthsSnapshot = await getDocs(fiscalMonthsRef);
+    const fiscalMonthsPromises = fiscalMonthsSnapshot.docs.map(
+      (documentSnapshot) => {
+        const docRef = doc(firestore, "fiscalMonths", documentSnapshot.id);
+        return updateDoc(docRef, {
+          autoFunds: deleteField(),
+        });
+      },
+    );
+
+    await Promise.all(fiscalMonthsPromises);
+    console.log("fiscalMonth autoFunds deleted");
+
+    // Delete all documents in the weeklySetGoalHistory collection
+    const weeklySetGoalHistoryRef = collection(
+      firestore,
+      "weeklySetGoalHistory",
+    );
+    const weeklySetGoalHistorySnapshot = await getDocs(weeklySetGoalHistoryRef);
+    const weeklySetGoalHistoryDeletePromises =
+      weeklySetGoalHistorySnapshot.docs.map((documentSnapshot) => {
+        const docRef = doc(
+          firestore,
+          "weeklySetGoalHistory",
+          documentSnapshot.id,
+        );
+        return deleteDoc(docRef);
+      });
+
+    await Promise.all(weeklySetGoalHistoryDeletePromises);
+    console.log("weeklySetGoalHistory's deleted");
+
+    // Delete all documents in the monthlyAddedFunds collection
+    const monthlyAddedFundsRef = collection(firestore, "monthlyAddedFunds");
+    const monthlyAddedFundsSnapshot = await getDocs(monthlyAddedFundsRef);
+    const monthlyAddedFundsDeletePromises = monthlyAddedFundsSnapshot.docs.map(
+      (documentSnapshot) => {
+        const docRef = doc(firestore, "monthlyAddedFunds", documentSnapshot.id);
+        return deleteDoc(docRef);
+      },
+    );
+
+    await Promise.all(monthlyAddedFundsDeletePromises);
+    console.log("monthlyAddedFunds's deleted");
+
+    // Delete all documents in the nonRecurringEntries collection
+    const nonRecurringEntriesRef = collection(firestore, "nonRecurringEntries");
+    const nonRecurringEntriesSnapshot = await getDocs(nonRecurringEntriesRef);
+    const deletePromises = nonRecurringEntriesSnapshot.docs.map(
+      (documentSnapshot) => {
+        const docRef = doc(
+          firestore,
+          "nonRecurringEntries",
+          documentSnapshot.id,
+        );
+        return deleteDoc(docRef);
+      },
+    );
+
+    await Promise.all(deletePromises);
+    console.log("nonRecurringEntries deleted");
+
+    console.log("Operations completed successfully");
+  } catch (error) {
+    console.error("Error in combined operation:", error);
+  }
+};
+
+export const fetchCurrentMonthlyGoal = async (): Promise<number | null> => {
+  const goalRef = doc(firestore, "familyBudget", "currentGoals");
+  const goalSnap = await getDoc(goalRef);
+
+  if (goalSnap.exists() && typeof goalSnap.data()?.monthlyGoal === "number") {
+    return goalSnap.data()?.monthlyGoal;
   } else {
     return null;
   }
 };
 
 export const updateMonthlyGoal = async (newGoal: number): Promise<void> => {
-  const goalRef = doc(firestore, "familyBudget", "currentGoal");
+  const goalRef = doc(firestore, "familyBudget", "currentGoals");
   const goalSnap = await getDoc(goalRef);
 
   if (goalSnap.exists()) {
     await updateDoc(goalRef, {
-      amount: newGoal,
+      monthlyGoal: newGoal,
     });
   } else {
     await setDoc(goalRef, {
-      amount: newGoal,
+      monthlyGoal: newGoal,
     });
   }
+};
+
+export const updateMonthlyAutoFunds = async (
+  newMonthlyAutoFunds: number,
+): Promise<void> => {
+  const docRef = doc(firestore, "familyBudget", "autoFunds");
+  try {
+    await updateDoc(docRef, {
+      monthlyFunds: newMonthlyAutoFunds,
+    });
+    console.log("Document successfully updated!");
+  } catch (error) {
+    console.error("Error updating document: ", error);
+  }
+};
+
+export const fetchMonthlyAddedFunds = async (): Promise<
+  MonthlyAddedFunds[]
+> => {
+  const monthlyAddedFundsCollection = collection(
+    firestore,
+    "monthlyAddedFunds",
+  );
+  const monthlyAddedFundsSnap = await getDocs(
+    query(monthlyAddedFundsCollection),
+  );
+
+  return monthlyAddedFundsSnap.docs.map(
+    (doc) => ({ docId: doc.id, ...doc.data() }) as MonthlyAddedFunds,
+  );
+};
+
+export const fetchWeeklyGoalHistory = async (): Promise<
+  WeeklyGoalHistory[]
+> => {
+  const weeklyGoalHistoryCollection = collection(
+    firestore,
+    "weeklySetGoalHistory",
+  );
+  const weeklyGoalHistorySnap = await getDocs(
+    query(weeklyGoalHistoryCollection),
+  );
+
+  return weeklyGoalHistorySnap.docs.map(
+    (doc) => ({ docId: doc.id, ...doc.data() }) as WeeklyGoalHistory,
+  );
 };
 
 export const fetchTotalIncomeAndExpenses = async (): Promise<{
@@ -616,7 +909,7 @@ export const fetchEntriesAfterDate = async (
   date: Timestamp,
 ): Promise<NonRecurringEntry[]> => {
   try {
-    const entriesRef = collection(firestore, "nonRecurringExpenses");
+    const entriesRef = collection(firestore, "nonRecurringEntries");
     const q = query(entriesRef, where("dateTime", ">", date));
     const querySnapshot = await getDocs(q);
     console.log(
@@ -637,7 +930,7 @@ export const fetchEntriesAfterDate = async (
 export async function fetchMostRecentEntryBeforeDate(
   date: Timestamp,
 ): Promise<NonRecurringEntry | null> {
-  const entriesRef = collection(firestore, "nonRecurringExpenses");
+  const entriesRef = collection(firestore, "nonRecurringEntries");
   const q = query(
     entriesRef,
     where("dateTime", "<", date),
@@ -660,7 +953,7 @@ export const updateEntries = async (
   await runTransaction(firestore, async (transaction) => {
     entries.forEach((entry) => {
       if (entry.docId) {
-        const entryRef = doc(firestore, "nonRecurringExpenses", entry.docId);
+        const entryRef = doc(firestore, "nonRecurringEntries", entry.docId);
         transaction.update(entryRef, entry);
       } else {
         // Throw an error if docId is undefined
@@ -701,51 +994,95 @@ export function calculateFiscalWeekRef(expenseDate: string): string {
   return fiscalWeekRefString;
 }
 
-// Function to convert MongoDB data to Firestore NonRecurringEntry format
-export const convertToNonRecurringEntry = (
+export type ConvertedEntries = {
+  nonRecurringEntries: NonRecurringEntry[];
+  monthlyAddedFunds: MonthlyAddedFunds[];
+};
+
+export const convertToNonRecurringEntry = async (
   mongoData: any[],
-): NonRecurringEntry[] => {
+): Promise<ConvertedEntries> => {
   // Sort entries chronologically by date
   const sortedData = mongoData.sort(
     (a, b) =>
       new Date(a.date.$date).getTime() - new Date(b.date.$date).getTime(),
   );
 
-  return sortedData.flatMap((entry, index, array) => {
+  const nonRecurringEntries: NonRecurringEntry[] = [];
+  const monthlyAddedFunds: MonthlyAddedFunds[] = [];
+
+  for (const entry of sortedData) {
     if (
       entry.type === "Changed Fiscal Monthly Auto Funds" ||
       entry.type === "Custom Number"
     ) {
-      // Skip these types of entries
-      return [];
+      continue; // Skip these types of entries
     }
 
     const date = new Date(entry.date.$date);
     const dateString = date.toISOString().split("T")[0]; // Format date as 'yyyy-MM-dd'
     const dateTime = Timestamp.fromDate(date); // Convert to Firestore Timestamp
-    const value = Math.abs(entry.amount) / 100; // Convert cents to positive dollars
-    const type = entry.type.toLowerCase(); // Convert type to lowercase
+    let value = Math.abs(entry.amount) / 100; // Convert cents to positive dollars
+    let type = entry.type.toLowerCase(); // Convert type to lowercase
     const notes = entry.notes;
-
-    // Check if notes is defined and a string, otherwise use an empty array
+    let category = entry.category;
     const tagStrings = typeof notes === "string" ? notes.split(/\s+/) : [];
     const tags = processTags(tagStrings);
 
-    let goalFrom;
-    let goalTo = entry.funds / 100;
+    let monthlyGoalFrom;
+    let monthlyGoalTo = 0;
+
+    let oldFunds;
+    let newFunds;
+    let addedFunds;
+    let fiscalMonthRef;
 
     switch (entry.type) {
       case "Expense":
-        goalFrom = (entry.funds + Math.abs(entry.amount)) / 100;
+        monthlyGoalFrom = 0;
         break;
       case "Refund":
+        monthlyGoalFrom = 0;
+        break;
       case "Added Funds":
-        goalFrom = (entry.funds - entry.amount) / 100;
-        break;
+        oldFunds = 0;
+        newFunds = 0;
+        addedFunds = entry.amount / 100;
+        fiscalMonthRef = await findFiscalMonthReference(dateString);
+        if (fiscalMonthRef) {
+          // Only add entry if fiscalMonthRef is not undefined
+          monthlyAddedFunds.push({
+            type:
+              entry.category === "Auto Funds"
+                ? entry.category
+                : "Misc Added Funds",
+            oldFunds,
+            newFunds,
+            addedFunds,
+            fiscalMonth: fiscalMonthRef,
+            date: dateTime,
+            notes,
+          });
+        }
+        continue;
       case "Custom Fiscal Monthly Amount":
-        const previousGoalTo = index > 0 ? array[index - 1].funds / 100 : 0;
-        goalFrom = previousGoalTo;
-        break;
+        oldFunds = 0;
+        newFunds = 0;
+        addedFunds = entry.amount / 100;
+        fiscalMonthRef = await findFiscalMonthReference(dateString);
+        if (fiscalMonthRef) {
+          // Only add entry if fiscalMonthRef is not undefined
+          monthlyAddedFunds.push({
+            type: "Misc Added Funds",
+            oldFunds,
+            newFunds,
+            addedFunds,
+            fiscalMonth: fiscalMonthRef,
+            date: dateTime,
+            notes,
+          });
+        }
+        continue;
     }
 
     const fiscalWeekString: string = calculateFiscalWeekRef(dateString);
@@ -753,20 +1090,94 @@ export const convertToNonRecurringEntry = (
       ? doc(firestore, "fiscalWeeks", fiscalWeekString)
       : undefined;
 
-    return {
-      category: entry.category,
+    nonRecurringEntries.push({
+      category,
       tags,
       date: dateString,
       dateTime,
       value,
       type,
       notes,
-      goalFrom,
-      goalTo,
+      monthlyGoalFrom,
+      monthlyGoalTo,
       fiscalWeekRef,
-    };
-  });
+    });
+  }
+
+  return {
+    nonRecurringEntries,
+    monthlyAddedFunds,
+  };
 };
+
+export async function findFiscalMonthReference(
+  dateString: string,
+): Promise<DocumentReference | undefined> {
+  const fiscalWeekString: string = calculateFiscalWeekRef(dateString);
+
+  if (!fiscalWeekString) {
+    return undefined;
+  }
+
+  const fiscalWeekRef: DocumentReference = doc(
+    firestore,
+    "fiscalWeeks",
+    fiscalWeekString,
+  );
+  try {
+    const fiscalWeekDoc = await getDoc(fiscalWeekRef);
+    if (fiscalWeekDoc.exists()) {
+      const fiscalMonthRef: DocumentReference = fiscalWeekDoc.data().month;
+      return fiscalMonthRef;
+    } else {
+      console.error("Fiscal week document does not exist.");
+      return undefined;
+    }
+  } catch (error) {
+    console.error("Error fetching fiscal week document:", error);
+    return undefined;
+  }
+}
+
+export async function addNonRecurringEntriesToFirestore(
+  nonRecurringEntries: NonRecurringEntry[],
+): Promise<void> {
+  try {
+    const collectionRef = collection(firestore, "nonRecurringEntries");
+    for (const entry of nonRecurringEntries) {
+      // Replace undefined with null or a default value
+      const entryToAdd = {
+        ...entry,
+        notes: entry.notes ?? "",
+        monthlyGoalFrom: entry.monthlyGoalFrom ?? 0,
+        monthlyGoalTo: entry.monthlyGoalTo ?? 0,
+        // Repeat for any other fields that might be undefined
+      };
+      await addDoc(collectionRef, entryToAdd);
+    }
+  } catch (error) {
+    console.error("Error adding non-recurring entries:", error);
+  }
+}
+
+export async function addMonthlyAddedFundsToFirestore(
+  monthlyAddedFunds: MonthlyAddedFunds[],
+): Promise<void> {
+  try {
+    const collectionRef = collection(firestore, "monthlyAddedFunds");
+    for (const fund of monthlyAddedFunds) {
+      // Replace undefined with null or a default value
+      const fundToAdd = {
+        ...fund,
+        notes: fund.notes ?? "", // Replace undefined with null
+        // Repeat for any other fields that might be undefined
+      };
+      await addDoc(collectionRef, fundToAdd);
+    }
+  } catch (error) {
+    console.error("Error adding monthly added funds:", error);
+  }
+}
 
 const capitalizeFirstLetter = (string: string) => {
   return string.charAt(0).toUpperCase() + string.slice(1);

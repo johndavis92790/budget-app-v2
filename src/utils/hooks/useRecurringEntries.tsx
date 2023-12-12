@@ -2,9 +2,9 @@ import {
   addRecurringEntry,
   updateRecurringEntry,
   deleteRecurringEntry,
+  RecurringEntry,
 } from "../FirebaseHelpers";
 import { useIncomesAndExpenses } from "./useIncomesAndExpenses";
-import { RecurringEntry } from "../Helpers";
 
 export const useRecurringEntries = () => {
   const { setIncomes, setExpenses } = useIncomesAndExpenses();

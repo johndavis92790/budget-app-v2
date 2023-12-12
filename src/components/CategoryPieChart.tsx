@@ -1,5 +1,5 @@
 import { Chart } from "react-google-charts";
-import { NonRecurringEntry } from "../utils/Helpers";
+import { NonRecurringEntry } from "../utils/FirebaseHelpers";
 
 interface CategoryPieChartProps {
   filteredExpenses: NonRecurringEntry[];

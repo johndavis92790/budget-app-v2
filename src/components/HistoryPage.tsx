@@ -1,9 +1,9 @@
 import React, { useState, useEffect } from "react";
 import {
-  addNonRecurringExpense,
-  updateNonRecurringExpense,
+  NonRecurringEntry,
+  addnonRecurringEntry,
+  updatenonRecurringEntry,
 } from "../utils/FirebaseHelpers";
-import { NonRecurringEntry } from "../utils/Helpers";
 import { TimeChart } from "./TimeChart";
 import TablePagination from "./TablePagination";
 import ExpensesTable from "./ExpensesTable";
@@ -13,9 +13,11 @@ import { useExpensesData } from "../utils/hooks/useExpensesData";
 import { useCategoriesAndTags } from "../utils/hooks/useCategoriesAndTags";
 import { CategoryBarChart } from "./CategoryBarChart";
 import CategoryPieChart from "./CategoryPieChart";
+import { useGoalHistoryData } from "../utils/hooks/useGoalHistoryData";
 
 const HistoryPage: React.FC = () => {
-  const { nonRecurringExpenses, minExpense, maxExpense } = useExpensesData();
+  const { nonRecurringEntries, minExpense, maxExpense } = useExpensesData();
+  const { monthlyAddedFunds, weeklyGoalHistory } = useGoalHistoryData();
   const { categories, tags } = useCategoriesAndTags();
 
   // Date-related states
@@ -74,7 +76,7 @@ const HistoryPage: React.FC = () => {
 
   // Effects
   useEffect(() => {
-    const results = nonRecurringExpenses.filter((expense) => {
+    const results = nonRecurringEntries.filter((expense) => {
       const matchesTags =
         !currentTags.length ||
         expense.tags.some((tag) => currentTags.includes(tag));
@@ -108,7 +110,7 @@ const HistoryPage: React.FC = () => {
     dateStart,
     dateEnd,
     amountRange,
-    nonRecurringExpenses,
+    nonRecurringEntries,
     currentTags,
     currentCategories,
   ]);
@@ -117,9 +119,9 @@ const HistoryPage: React.FC = () => {
     try {
       if (editExpense) {
         if (editExpense.docId) {
-          await updateNonRecurringExpense(editExpense.docId, editExpense);
+          await updatenonRecurringEntry(editExpense.docId, editExpense);
         } else {
-          await addNonRecurringExpense(editExpense);
+          await addnonRecurringEntry(editExpense);
         }
         handleCloseModal();
       } else {
@@ -193,6 +195,8 @@ const HistoryPage: React.FC = () => {
 
       <ExpensesTable
         displayedExpenses={displayedExpenses}
+        monthlyAddedFunds={monthlyAddedFunds}
+        weeklyGoalHistory={weeklyGoalHistory}
         handleShowModal={handleShowModal}
       />
 

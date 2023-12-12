@@ -1,10 +1,11 @@
 import React, { useState } from "react";
-import { RecurringEntry, calculateTotals } from "../utils/Helpers";
+import { calculateTotals } from "../utils/Helpers";
 import { useIncomesAndExpenses } from "../utils/hooks/useIncomesAndExpenses";
 import EntryModal from "./EntryModal";
 import { RecurringExpensesTable } from "./RecurringExpensesTable";
 import { useRecurringEntries } from "../utils/hooks/useRecurringEntries";
 import AveragesAndTotalsTable from "./AveragesAndTotalsTable";
+import { RecurringEntry } from "../utils/FirebaseHelpers";
 
 const RecurringExpensesPage: React.FC = () => {
   const { incomes, sortedIncomes, sortedExpenses } = useIncomesAndExpenses();

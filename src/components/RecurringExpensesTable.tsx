@@ -1,5 +1,6 @@
 import { Table, Button } from "react-bootstrap";
-import { RecurringEntry, formatAsCurrency } from "../utils/Helpers";
+import { formatAsCurrency } from "../utils/Helpers";
+import { RecurringEntry } from "../utils/FirebaseHelpers";
 
 export const RecurringExpensesTable: React.FC<{
   title: string;
