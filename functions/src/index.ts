@@ -90,7 +90,7 @@ exports.updateMonthlyGoal = functions.pubsub
       ) as CollectionReference<MonthlyAddedFunds>;
 
       await monthlyAddedFundsCollection.add({
-        type: "auto added funds",
+        type: "Auto Funds",
         oldFunds: Number(monthlyGoal),
         newFunds: Number(monthlyGoal + monthlyFunds),
         addedFunds: Number(monthlyFunds),
